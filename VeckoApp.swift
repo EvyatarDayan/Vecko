@@ -12,6 +12,10 @@ struct VeckoApp: App {
     @StateObject private var currencyManager = CurrencyManager()
     @StateObject private var languageManager = LanguageManager()
 
+    init() {
+        VeckoToolbarAppearance.configure()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

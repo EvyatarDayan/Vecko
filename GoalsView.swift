@@ -71,6 +71,7 @@ final class GoalsStore: ObservableObject {
 }
 
 struct GoalsView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var familyStore: FamilyStore
     @EnvironmentObject var goalsStore: GoalsStore
     @EnvironmentObject var historyStore: HistoryStore
@@ -94,61 +95,80 @@ struct GoalsView: View {
     }
 
     var body: some View {
+        goalsNavigationStack
+            .onAppear {
+                syncSelectedKid()
+            }
+            .onChange(of: kids.map(\.id)) { _, _ in
+                syncSelectedKid()
+            }
+    }
+
+    private var goalsNavigationStack: some View {
         NavigationStack {
-            ZStack(alignment: .topTrailing) {
-                VStack(spacing: 0) {
-                    pageHeader
-                    if kids.isEmpty {
-                        emptyKidsState
-                    } else {
-                        kidSelector
-                        goalsContent
-                    }
+            goalsZStackWithChrome
+                .background(Color(.systemGroupedBackground))
+                .navigationTitle("")
+                .navigationBarTitleDisplayMode(.inline)
+                .sheet(isPresented: $showingAddGoal) {
+                    addGoalSheet
                 }
-                Button {
-                    showingAddGoal = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.headline)
-                        .padding(10)
-                        .background(Color(.systemBackground))
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+                .sheet(item: $editingGoal) { goal in
+                    editGoalSheet(goal: goal)
                 }
-                .padding(.top, 6)
-                .padding(.trailing, 16)
-                .disabled(kids.isEmpty)
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showingAddGoal) {
-                AddGoalView(mode: .add(defaultKidId: selectedKid?.id)) { goal in
-                    goalsStore.addGoal(goal)
-                    let kidName = familyStore.kids.first(where: { $0.id == goal.kidId })?.name ?? languageManager.text(.unknownKid)
-                    historyStore.recordGoalAdded(kidId: goal.kidId, kidName: kidName, goalTitle: goal.title, targetAmount: goal.targetAmount)
-                }
-                .environmentObject(familyStore)
-                .environmentObject(currencyManager)
-                .environmentObject(languageManager)
-            }
-            .sheet(item: $editingGoal) { goal in
-                AddGoalView(mode: .edit(goal)) { updated in
-                    goalsStore.updateGoal(updated)
-                }
-                .environmentObject(familyStore)
-                .environmentObject(currencyManager)
-                .environmentObject(languageManager)
-            }
-        }
-        .onAppear {
-            syncSelectedKid()
-        }
-        .onChange(of: kids.map(\.id)) { _, _ in
-            syncSelectedKid()
         }
     }
 
+    private var goalsZStackWithChrome: some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 0) {
+                pageHeader
+                if kids.isEmpty {
+                    emptyKidsState
+                } else {
+                    kidSelector
+                    goalsContent
+                }
+            }
+            addGoalFloatingButton
+        }
+    }
+
+    private var addGoalFloatingButton: some View {
+        Button {
+            showingAddGoal = true
+        } label: {
+            Image(systemName: "plus")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(Color.appGreen)
+        }
+        .veckoToolbarActionStyle()
+        .padding(.top, 6)
+        .padding(.trailing, 16)
+        .disabled(kids.isEmpty)
+    }
+
+    private var addGoalSheet: some View {
+        AddGoalView(mode: .add(defaultKidId: selectedKid?.id)) { goal in
+            goalsStore.addGoal(goal)
+            let kidName = familyStore.kids.first(where: { $0.id == goal.kidId })?.name ?? languageManager.text(.unknownKid)
+            historyStore.recordGoalAdded(kidId: goal.kidId, kidName: kidName, goalTitle: goal.title, targetAmount: goal.targetAmount)
+        }
+        .environmentObject(familyStore)
+        .environmentObject(currencyManager)
+        .environmentObject(languageManager)
+    }
+
+    private func editGoalSheet(goal: KidGoal) -> some View {
+        AddGoalView(mode: .edit(goal), onSave: { updated in
+            goalsStore.updateGoal(updated)
+        }, onDelete: {
+            goalsStore.removeGoal(id: goal.id)
+        })
+        .environmentObject(familyStore)
+        .environmentObject(currencyManager)
+        .environmentObject(languageManager)
+    }
 
     private var pageHeader: some View {
         VStack(alignment: .center, spacing: 4) {
@@ -164,6 +184,14 @@ struct GoalsView: View {
         .padding(.horizontal)
          .padding(.top, 15)
          .padding(.bottom, 6)
+    }
+
+    private var goalsFilterChipIdleBackground: Color {
+        if colorScheme == .light {
+            Color(UIColor.systemGray5)
+        } else {
+            Color(UIColor.secondarySystemBackground)
+        }
     }
 
     private func syncSelectedKid() {
@@ -184,7 +212,7 @@ struct GoalsView: View {
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(selectedKidID == nil ? Color.blue.opacity(0.18) : Color(.secondarySystemBackground))
+                        .background(selectedKidID == nil ? Color.blue.opacity(0.18) : goalsFilterChipIdleBackground)
                         .foregroundStyle(selectedKidID == nil ? Color.blue : Color.primary)
                         .clipShape(Capsule())
                 }
@@ -198,7 +226,7 @@ struct GoalsView: View {
                             .font(.subheadline.weight(.semibold))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
-                            .background(selectedKidID == kid.id ? Color.blue.opacity(0.18) : Color(.secondarySystemBackground))
+                            .background(selectedKidID == kid.id ? Color.blue.opacity(0.18) : goalsFilterChipIdleBackground)
                             .foregroundStyle(selectedKidID == kid.id ? Color.blue : Color.primary)
                             .clipShape(Capsule())
                     }
@@ -211,49 +239,55 @@ struct GoalsView: View {
         }
     }
 
+    private var emptyGoalsTitle: String {
+        if let kid = selectedKid {
+            String(
+                format: languageManager.text(.goalsNoGoalsForKidTitleFormat),
+                locale: languageManager.locale,
+                arguments: [kid.name]
+            )
+        } else {
+            languageManager.text(.goalsNoGoalsTitle)
+        }
+    }
+
+    private var emptyGoalsSubtitle: String {
+        if let kid = selectedKid {
+            String(
+                format: languageManager.text(.goalsNoGoalsForKidSubtitleFormat),
+                locale: languageManager.locale,
+                arguments: [kid.name]
+            )
+        } else {
+            languageManager.text(.goalsNoGoalsSubtitle)
+        }
+    }
+
     private var goalsContent: some View {
         Group {
             if visibleGoals.isEmpty {
                 VStack(spacing: 12) {
                     Spacer()
-                    Image(systemName: "target")
-                        .font(.system(size: 42))
-                        .foregroundStyle(.secondary)
-                    Text(languageManager.text(.goalsNoGoalsTitle))
+                    Image("goal")
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: 72, height: 72)
+                        .opacity(0.85)
+                    Text(emptyGoalsTitle)
                         .font(.headline)
-                    Text(languageManager.text(.goalsNoGoalsSubtitle))
+                    Text(emptyGoalsSubtitle)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
-                    Button {
-                        showingAddGoal = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(width: 42, height: 42)
-                            .background(Color.appGreen)
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
                     Spacer()
                 }
             } else {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         ForEach(visibleGoals) { goal in
-                            GoalRowView(goal: goal, kid: kid(for: goal.kidId))
-                                .onTapGesture {
-                                    editingGoal = goal
-                                }
-                                .swipeActions {
-                                    Button(role: .destructive) {
-                                        goalsStore.removeGoal(id: goal.id)
-                                    } label: {
-                                        Label(languageManager.text(.goalsDeleteSwipe), systemImage: "trash")
-                                    }
-                                }
+                            goalListRow(goal: goal)
                         }
                     }
                     .padding()
@@ -261,6 +295,22 @@ struct GoalsView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func goalListRow(goal: KidGoal) -> some View {
+        GoalRowView(goal: goal, kid: kid(for: goal.kidId))
+            .contentShape(Rectangle())
+            .onTapGesture {
+                editingGoal = goal
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: .destructive) {
+                    goalsStore.removeGoal(id: goal.id)
+                } label: {
+                    Label(languageManager.text(.goalsDeleteSwipe), systemImage: "trash")
+                }
+            }
     }
 
     private var emptyKidsState: some View {
@@ -297,31 +347,41 @@ private struct GoalRowView: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            if let data = goal.imageData, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 84, height: 84)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            } else if let icon = goal.iconSystemName {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.blue.opacity(0.15))
-                    .frame(width: 84, height: 84)
-                    .overlay(
-                        Image(systemName: icon)
-                            .font(.title2)
-                            .foregroundStyle(.blue)
-                    )
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.blue.opacity(0.15))
-                    .frame(width: 84, height: 84)
-                    .overlay(
-                        Image(systemName: "photo")
-                            .font(.title2)
-                            .foregroundStyle(.blue)
-                    )
+            ZStack(alignment: .topTrailing) {
+                Group {
+                    if let data = goal.imageData, let image = UIImage(data: data) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 84, height: 84)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    } else if let icon = goal.iconSystemName {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.blue.opacity(0.15))
+                            .frame(width: 84, height: 84)
+                            .overlay(
+                                Image(systemName: icon)
+                                    .font(.title2)
+                                    .foregroundStyle(.blue)
+                            )
+                    } else {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.blue.opacity(0.15))
+                            .frame(width: 84, height: 84)
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .font(.title2)
+                                    .foregroundStyle(.blue)
+                            )
+                    }
+                }
+
+                if let kid {
+                    kidProfileBadge(kid: kid)
+                        .padding(4)
+                }
             }
+            .frame(width: 84, height: 84)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(goal.title)
@@ -352,6 +412,20 @@ private struct GoalRowView: View {
         )
         .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 1)
     }
+
+    @ViewBuilder
+    private func kidProfileBadge(kid: FamilyKid) -> some View {
+        KidStoredIconView(
+            iconName: kid.icon,
+            customImageData: kid.customImageData,
+            size: 28,
+            symbolAccentColor: kid.iconColor
+        )
+        .overlay(
+            Circle()
+                .strokeBorder(Color(.systemBackground), lineWidth: 2)
+        )
+    }
 }
 
 private struct AddGoalView: View {
@@ -367,6 +441,7 @@ private struct AddGoalView: View {
 
     let mode: Mode
     let onSave: (KidGoal) -> Void
+    let onDelete: (() -> Void)?
 
     @State private var selectedKidId: UUID?
     @State private var title = ""
@@ -375,6 +450,13 @@ private struct AddGoalView: View {
     @State private var selectedIcon: String?
     @State private var showingAssetPicker = false
     @State private var attemptedSave = false
+    @State private var showingDeleteConfirm = false
+
+    init(mode: Mode, onSave: @escaping (KidGoal) -> Void, onDelete: (() -> Void)? = nil) {
+        self.mode = mode
+        self.onSave = onSave
+        self.onDelete = onDelete
+    }
 
     private var kids: [FamilyKid] { familyStore.kids }
 
@@ -400,7 +482,15 @@ private struct AddGoalView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            VStack(spacing: 0) {
+                VeckoPlainSheetBar(
+                    title: navigationTitle,
+                    leadingTitle: languageManager.text(.commonCancel),
+                    trailingTitle: languageManager.text(.commonSave),
+                    onLeading: { dismiss() },
+                    onTrailing: { saveGoal() }
+                )
+                Form {
                 Section(languageManager.text(.goalsSectionGoal)) {
                     Picker(languageManager.text(.goalsPickerKid), selection: $selectedKidId) {
                         ForEach(kids) { kid in
@@ -470,16 +560,26 @@ private struct AddGoalView: View {
                         .foregroundStyle(attemptedSave && !isVisualValid ? .red : .blue)
                     }
                 }
+
+                if case .edit = mode, onDelete != nil {
+                    Section {
+                        Button(role: .destructive) {
+                            showingDeleteConfirm = true
+                        } label: {
+                            Text(languageManager.text(.goalsDeleteFromDetail))
+                        }
+                    }
+                }
             }
-            .navigationTitle(navigationTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(languageManager.text(.commonCancel)) { dismiss() }
+            }
+            .toolbar(.hidden, for: .navigationBar)
+            .alert(languageManager.text(.goalsDeleteGoalConfirmTitle), isPresented: $showingDeleteConfirm) {
+                Button(languageManager.text(.commonCancel), role: .cancel) { }
+                Button(languageManager.text(.goalsDeleteSwipe), role: .destructive) {
+                    confirmDeleteGoal()
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(languageManager.text(.commonSave)) { saveGoal() }
-                }
+            } message: {
+                Text(languageManager.text(.goalsDeleteGoalConfirmMessage))
             }
             .onAppear {
                 switch mode {
@@ -540,6 +640,11 @@ private struct AddGoalView: View {
             createdAt: createdAt
         )
         onSave(goal)
+        dismiss()
+    }
+
+    private func confirmDeleteGoal() {
+        onDelete?()
         dismiss()
     }
 
@@ -615,8 +720,13 @@ private struct GoalAssetPickerView: View {
     private let columns = Array(repeating: GridItem(.flexible()), count: 4)
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
+                VeckoPlainSheetBar(
+                    title: languageManager.text(.goalsAddPhoto),
+                    trailingTitle: languageManager.text(.commonDone),
+                    onTrailing: { dismiss() }
+                )
                 Picker(languageManager.text(.pickerSelection), selection: $selectedTab) {
                     Text(languageManager.text(.iconPickerIcons)).tag(0)
                     Text(languageManager.text(.iconPickerPhotos)).tag(1)
@@ -673,15 +783,7 @@ private struct GoalAssetPickerView: View {
                     .padding()
                 }
             }
-            .navigationTitle(languageManager.text(.goalsAddPhoto))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(languageManager.text(.commonDone)) {
-                        dismiss()
-                    }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingImagePicker) {
                 GoalImagePicker(selectedImage: $selectedImage, onImageSelected: {
                     selectedIcon = nil

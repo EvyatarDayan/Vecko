@@ -97,9 +97,42 @@ struct InsightsView: View {
                 category: category,
                 amount: transaction.amount,
                 date: transaction.date,
-                icon: icon
+                icon: icon,
+                isProjected: false
             )
         }
+    }
+
+    /// Past deposits and withdrawals for the calendar (interest excluded).
+    private var pastCalendarEvents: [AllowanceEvent] {
+        events.filter { $0.category != .interest }
+    }
+
+    /// Scheduled allowance payments in the next 60 days (no interest).
+    private var projectedAllowanceEvents: [AllowanceEvent] {
+        ScheduledAllowanceProjection.projectedPayments(
+            kids: familyStore.kids,
+            calendar: calendar
+        ).map { item in
+            AllowanceEvent(
+                id: ScheduledAllowanceProjection.stableEventID(
+                    kidId: item.kid.id,
+                    scheduledAt: item.scheduledAt,
+                    calendar: calendar
+                ),
+                kidId: item.kid.id,
+                kidName: item.kid.name,
+                category: .deposit,
+                amount: item.kid.weeklyAllowance,
+                date: item.scheduledAt,
+                icon: "calendar.badge.clock",
+                isProjected: true
+            )
+        }
+    }
+
+    private var calendarEvents: [AllowanceEvent] {
+        pastCalendarEvents + projectedAllowanceEvents
     }
 
     /// Activity rows limited to the month shown in the calendar / overview.
@@ -357,14 +390,15 @@ struct InsightsView: View {
                     if !goalCompletionRows.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             ForEach(Array(goalCompletionRows.enumerated()), id: \.element.kidId) { index, item in
+                                let goalGraphicSize: CGFloat = 48
                                 VStack(spacing: 12) {
-                                    HStack(spacing: 12) {
+                                    HStack(alignment: .center, spacing: 12) {
                                         GoalRadialProgressView(
                                             percent: item.completionPercent,
                                             color: item.color,
                                             lineWidth: 7
                                         )
-                                        .frame(width: 48, height: 48)
+                                        .frame(width: goalGraphicSize, height: goalGraphicSize)
 
                                         VStack(alignment: .leading, spacing: 4) {
                                             HStack(spacing: 8) {
@@ -393,7 +427,14 @@ struct InsightsView: View {
                                             .font(.caption)
                                             .foregroundColor(.secondary)
                                         }
-                                        Spacer()
+                                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+
+                                        KidStoredIconView(
+                                            iconName: item.icon,
+                                            customImageData: item.customImageData,
+                                            size: goalGraphicSize,
+                                            symbolAccentColor: item.color
+                                        )
                                     }
 
                                     if index < goalCompletionRows.count - 1 {
@@ -530,6 +571,7 @@ struct InsightsView: View {
                                         ForEach(Array(eventsForDate(date).prefix(dotCount)), id: \.id) { event in
                                             Circle()
                                                 .fill(categoryColor(for: event.category))
+                                                .opacity(event.isProjected ? 0.45 : 1)
                                                 .frame(width: 4, height: 4)
                                         }
                                     }
@@ -581,27 +623,27 @@ struct InsightsView: View {
                                     HStack {
                                         ZStack {
                                             Circle()
-                                                .fill(categoryColor(for: event.category).opacity(0.15))
+                                                .fill(categoryColor(for: event.category).opacity(event.isProjected ? 0.08 : 0.15))
                                                 .frame(width: 30, height: 30)
                                             Image(systemName: event.icon)
                                                 .font(.caption)
-                                                .foregroundColor(categoryColor(for: event.category))
+                                                .foregroundColor(categoryColor(for: event.category).opacity(event.isProjected ? 0.7 : 1))
                                         }
 
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(event.kidName)
                                                 .font(.subheadline)
                                                 .fontWeight(.medium)
-                                            Text(event.category.localizedTitle(language: languageManager.language))
+                                            Text(eventSubtitle(for: event))
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
                                         }
 
                                         Spacer()
 
-                                        Text(signedAmountText(for: event))
+                                        Text(amountText(for: event))
                                             .font(.caption)
-                                            .foregroundColor(.primary)
+                                            .foregroundColor(event.isProjected ? .secondary : .primary)
                                     }
                                     .padding(.vertical, 4)
                                 }
@@ -650,7 +692,7 @@ struct InsightsView: View {
         }
     }
 
-    private var goalCompletionRows: [(kidId: UUID, name: String, completionPercent: Int, goalsCount: Int, color: Color)] {
+    private var goalCompletionRows: [(kidId: UUID, name: String, completionPercent: Int, goalsCount: Int, color: Color, icon: String, customImageData: Data?)] {
         familyStore.kids
             .enumerated()
             .map { index, kid in
@@ -669,7 +711,9 @@ struct InsightsView: View {
                     name: kid.name,
                     completionPercent: completion,
                     goalsCount: goals.count,
-                    color: categoryPalette[index % categoryPalette.count]
+                    color: categoryPalette[index % categoryPalette.count],
+                    icon: kid.icon,
+                    customImageData: kid.customImageData
                 )
             }
             .sorted { $0.completionPercent > $1.completionPercent }
@@ -772,7 +816,7 @@ struct InsightsView: View {
     }
 
     private func eventsForDate(_ date: Date) -> [AllowanceEvent] {
-        events.filter { calendar.isDate($0.date, inSameDayAs: date) }
+        calendarEvents.filter { calendar.isDate($0.date, inSameDayAs: date) }
     }
 
     private func isToday(_ date: Date) -> Bool {
@@ -789,6 +833,24 @@ struct InsightsView: View {
     private func signedAmountText(for event: AllowanceEvent) -> String {
         let sign = event.category == .withdraw ? "-" : "+"
         return "\(sign)\(currencyManager.formatAmount(event.amount))"
+    }
+
+    private func eventSubtitle(for event: AllowanceEvent) -> String {
+        if event.isProjected {
+            return languageManager.text(.insightsCategoryExpectedAllowance)
+        }
+        return event.category.localizedTitle(language: languageManager.language)
+    }
+
+    private func amountText(for event: AllowanceEvent) -> String {
+        if event.isProjected {
+            return String(
+                format: languageManager.text(.insightsExpectedAmountFormat),
+                locale: languageManager.locale,
+                arguments: [currencyManager.formatAmount(event.amount)]
+            )
+        }
+        return signedAmountText(for: event)
     }
 
 }
@@ -894,6 +956,7 @@ private struct AllowanceEvent: Identifiable {
     let amount: Double
     let date: Date
     let icon: String
+    let isProjected: Bool
 }
 
 private struct HistoryKidFilter: Identifiable {
@@ -965,14 +1028,12 @@ private struct FamilyHistoryRowView: View {
                 .frame(width: 50, height: 50)
                 .clipShape(Circle())
         } else if let kid {
-            ZStack {
-                Circle()
-                    .fill(kid.iconColor.opacity(0.15))
-                    .frame(width: 50, height: 50)
-                Image(systemName: kid.icon)
-                    .font(.title2)
-                    .foregroundColor(kid.iconColor)
-            }
+            KidStoredIconView(
+                iconName: kid.icon,
+                customImageData: kid.customImageData,
+                size: 50,
+                symbolAccentColor: kid.iconColor
+            )
         } else {
             ZStack {
                 Circle()

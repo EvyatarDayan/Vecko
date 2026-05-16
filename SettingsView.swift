@@ -82,6 +82,31 @@ struct SettingsView: View {
 
                             Spacer()
                             Toggle("", isOn: $isDarkMode)
+                                .labelsHidden()
+                                .scaleEffect(0.72, anchor: .trailing)
+                        }
+                    }
+
+                    Section(languageManager.text(.settingsSectionData)) {
+                        settingsButtonRow(
+                            icon: "square.and.arrow.up.fill",
+                            iconColor: .blue,
+                            title: languageManager.text(.settingsExportTitle),
+                            subtitle: languageManager.text(.settingsExportSubtitle),
+                            trailingText: nil
+                        ) {
+                            exportDataToPDF()
+                        }
+
+                        settingsButtonRow(
+                            icon: "trash.fill",
+                            iconColor: .red,
+                            title: languageManager.text(.settingsClearTitle),
+                            subtitle: languageManager.text(.settingsClearSubtitle),
+                            trailingText: nil,
+                            titleColor: .red
+                        ) {
+                            showingClearDataAlert = true
                         }
                     }
 
@@ -117,29 +142,6 @@ struct SettingsView: View {
                         }
                     }
 
-                    Section(languageManager.text(.settingsSectionData)) {
-                        settingsButtonRow(
-                            icon: "square.and.arrow.up.fill",
-                            iconColor: .blue,
-                            title: languageManager.text(.settingsExportTitle),
-                            subtitle: languageManager.text(.settingsExportSubtitle),
-                            trailingText: nil
-                        ) {
-                            exportDataToPDF()
-                        }
-
-                        settingsButtonRow(
-                            icon: "trash.fill",
-                            iconColor: .red,
-                            title: languageManager.text(.settingsClearTitle),
-                            subtitle: languageManager.text(.settingsClearSubtitle),
-                            trailingText: nil,
-                            titleColor: .red
-                        ) {
-                            showingClearDataAlert = true
-                        }
-                    }
-
                     Section {
                         Text("")
                             .frame(height: 30)
@@ -161,15 +163,15 @@ struct SettingsView: View {
                     .environmentObject(languageManager)
             }
             .sheet(isPresented: $showingHelpSupport) {
-                SettingsPlaceholderDetailView(title: languageManager.text(.settingsSheetHelpTitle))
+                VeckoHelpSupportView()
                     .environmentObject(languageManager)
             }
             .sheet(isPresented: $showingTermsPrivacy) {
-                SettingsPlaceholderDetailView(title: languageManager.text(.settingsSheetTermsTitle))
+                VeckoTermsPrivacyView()
                     .environmentObject(languageManager)
             }
             .sheet(isPresented: $showingAbout) {
-                SettingsPlaceholderDetailView(title: languageManager.text(.settingsSheetAboutTitle))
+                VeckoAboutView()
                     .environmentObject(languageManager)
             }
             .sheet(
@@ -266,12 +268,14 @@ struct SettingsView: View {
             currentY += ceil(bounds.height) + spacingAfter
         }
 
+        let titleBlue = UIColor.systemBlue
+
         startPage()
-        drawText("Vecko Export", font: .boldSystemFont(ofSize: 24), spacingAfter: 4)
+        drawText("Vecko Export", font: .boldSystemFont(ofSize: 24), color: titleBlue, spacingAfter: 4)
         drawText("Generated: \(Date().formatted(date: .abbreviated, time: .shortened))", font: .systemFont(ofSize: 12), color: .darkGray, spacingAfter: 16)
 
         // Family section
-        drawText("Kids (\(familyStore.kids.count))", font: .boldSystemFont(ofSize: 16), spacingAfter: 6)
+        drawText("Kids (\(familyStore.kids.count))", font: .boldSystemFont(ofSize: 16), color: titleBlue, spacingAfter: 6)
         if familyStore.kids.isEmpty {
             drawText("No kids.", font: .systemFont(ofSize: 12), color: .darkGray, spacingAfter: 12)
         } else {
@@ -283,20 +287,29 @@ struct SettingsView: View {
         }
 
         // Goals section
-        drawText("Goals (\(goalsStore.goals.count))", font: .boldSystemFont(ofSize: 16), spacingAfter: 6)
+        drawText("Goals (\(goalsStore.goals.count))", font: .boldSystemFont(ofSize: 16), color: titleBlue, spacingAfter: 6)
         if goalsStore.goals.isEmpty {
             drawText("No goals.", font: .systemFont(ofSize: 12), color: .darkGray, spacingAfter: 12)
         } else {
             for goal in goalsStore.goals {
-                let kidName = familyStore.kids.first(where: { $0.id == goal.kidId })?.name ?? "Unknown kid"
-                let line = "• \(goal.title) | Kid: \(kidName) | Target: \(currencyManager.formatAmount(goal.targetAmount))"
+                let kid = familyStore.kids.first(where: { $0.id == goal.kidId })
+                let kidName = kid?.name ?? languageManager.text(.unknownKid)
+                let balance = max(0, kid?.currentBalance ?? 0)
+                let progress: Double = goal.targetAmount > 0 ? min(1, balance / goal.targetAmount) : 0
+                let percent = Int((progress * 100).rounded())
+                let percentLabel = String(
+                    format: languageManager.text(.goalsPercentCompleteFormat),
+                    locale: languageManager.locale,
+                    arguments: [percent]
+                )
+                let line = "• \(goal.title) | Kid: \(kidName) | Target: \(currencyManager.formatAmount(goal.targetAmount)) | \(percentLabel)"
                 drawText(line, font: .systemFont(ofSize: 12), spacingAfter: 4)
             }
             currentY += 8
         }
 
         // Activity section
-        drawText("Transactions (\(activityStore.transactions.count))", font: .boldSystemFont(ofSize: 16), spacingAfter: 6)
+        drawText("Transactions (\(activityStore.transactions.count))", font: .boldSystemFont(ofSize: 16), color: titleBlue, spacingAfter: 6)
         if activityStore.transactions.isEmpty {
             drawText("No transactions.", font: .systemFont(ofSize: 12), color: .darkGray, spacingAfter: 12)
         } else {
@@ -309,7 +322,7 @@ struct SettingsView: View {
         }
 
         // History section
-        drawText("History (\(historyStore.entries.count))", font: .boldSystemFont(ofSize: 16), spacingAfter: 6)
+        drawText("History (\(historyStore.entries.count))", font: .boldSystemFont(ofSize: 16), color: titleBlue, spacingAfter: 6)
         if historyStore.entries.isEmpty {
             drawText("No history.", font: .systemFont(ofSize: 12), color: .darkGray, spacingAfter: 12)
         } else {
@@ -395,43 +408,19 @@ struct SettingsView: View {
     }
 }
 
-private struct SettingsPlaceholderDetailView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var languageManager: LanguageManager
-    let title: String
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 12) {
-                Text(title)
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                Text(languageManager.text(.settingsPlaceholderMessage))
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle(languageManager.text(.settingsPlaceholderNavTitle))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(languageManager.text(.commonClose)) {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
 private struct LanguagePickerView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var languageManager: LanguageManager
 
     var body: some View {
         NavigationStack {
-            ZStack {
+            VStack(spacing: 0) {
+                VeckoPlainSheetBar(
+                    title: languageManager.text(.languagePickerTitle),
+                    trailingTitle: languageManager.text(.commonDone),
+                    onTrailing: { dismiss() }
+                )
+                ZStack {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
 
@@ -465,19 +454,8 @@ private struct LanguagePickerView: View {
                 }
                 .scrollContentBackground(.hidden)
             }
-            .navigationTitle(languageManager.text(.languagePickerTitle))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(languageManager.text(.commonDone)) {
-                        dismiss()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color(.systemBackground))
-                    .clipShape(Capsule())
-                }
             }
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 }

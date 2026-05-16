@@ -8,13 +8,20 @@
 import SwiftUI
 import UIKit
 
+@MainActor
 struct HomeView: View {
     @EnvironmentObject var currencyManager: CurrencyManager
     @EnvironmentObject var familyStore: FamilyStore
     @EnvironmentObject var languageManager: LanguageManager
+    @EnvironmentObject var historyStore: HistoryStore
+    @EnvironmentObject var activityStore: ActivityStore
+    @EnvironmentObject var goalsStore: GoalsStore
 
     @AppStorage("home.selectedKidID") private var selectedKidIDRaw: String = ""
     @State private var cardFlipAngle: Double = 0
+    @State private var showingAddKid = false
+    @State private var editingKid: FamilyKid?
+    @State private var activeTransactionType: FamilyBulkTransactionType?
 
     private var kids: [KidAllowance] {
         familyStore.kids.map(KidAllowance.init(from:))
@@ -35,31 +42,96 @@ struct HomeView: View {
         UUID(uuidString: selectedKidIDRaw)
     }
 
-    private var familyTotalBalance: Double {
-        kids.reduce(0) { $0 + $1.currentBalance }
+    /// Selected card’s `FamilyKid` for editing (same logic as list / card selection).
+    private var focusedFamilyKid: FamilyKid? {
+        guard let id = selectedKid?.id else { return nil }
+        return familyStore.kids.first(where: { $0.id == id })
     }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                VStack(spacing: 20) {
-                    headerSection
-                    summaryCard
-                }
-                .padding()
-                .background(Color(.systemGroupedBackground))
+            ZStack(alignment: .top) {
+                VStack(spacing: 0) {
+                    VStack(spacing: 20) {
+                        headerSection
+                        summaryCard
+                    }
+                    .padding()
+                    .background(Color(.systemGroupedBackground))
 
-                if kids.isEmpty {
-                    emptyStateView
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color(.systemGroupedBackground))
-                } else {
-                    kidsListSection
-                        .background(Color(.systemGroupedBackground))
+                    if kids.isEmpty {
+                        emptyStateView
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(Color(.systemGroupedBackground))
+                    } else {
+                        kidsListSection
+                            .background(Color(.systemGroupedBackground))
+                    }
                 }
+
+                HStack(alignment: .center) {
+                    Button {
+                        if let kid = focusedFamilyKid {
+                            editingKid = kid
+                        }
+                    } label: {
+                        Text(languageManager.text(.homeNavEdit))
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(Color.appGreen)
+                    }
+                    .veckoToolbarActionStyle()
+                    .disabled(focusedFamilyKid == nil)
+
+                    Spacer(minLength: 0)
+
+                    Button {
+                        showingAddKid = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(Color.appGreen)
+                    }
+                    .veckoToolbarActionStyle()
+                }
+                .padding(.top, 6)
+                .padding(.horizontal, 20)
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showingAddKid) {
+                AddEditKidView(mode: .add, onDelete: nil) { newKid in
+                    familyStore.addKid(newKid)
+                    historyStore.recordKidAdded(kidId: newKid.id, kidName: newKid.name)
+                }
+            }
+            .sheet(item: $editingKid) { kid in
+                AddEditKidView(
+                    mode: .edit(kid),
+                    onDelete: { deletedID, deletedName in
+                        familyStore.deleteKid(id: deletedID)
+                        activityStore.removeAll(forKidId: deletedID)
+                        goalsStore.removeGoals(forKidId: deletedID)
+                        historyStore.recordKidRemoved(kidId: deletedID, kidName: deletedName)
+                        if selectedKidID == deletedID {
+                            persistSelectedKidID(familyStore.kids.first?.id)
+                        }
+                    }
+                ) { updatedKid in
+                    familyStore.updateKid(updatedKid)
+                    historyStore.recordKidUpdated(kidId: updatedKid.id, kidName: updatedKid.name)
+                }
+            }
+            .sheet(item: $activeTransactionType) { type in
+                FamilyBulkTransactionView(
+                    type: type,
+                    initialSelectedKidIDs: selectedKid.map { Set([$0.id]) },
+                    onConfirm: { amount, note, kidIDs in
+                        applyBulkTransaction(type: type, amount: amount, note: note, selectedKidIDs: kidIDs)
+                    }
+                )
+                .environmentObject(currencyManager)
+                .environmentObject(familyStore)
+            }
         }
         .onAppear {
             syncSelectionIfNeeded()
@@ -92,17 +164,43 @@ struct HomeView: View {
         }
     }
 
-    private var headerSection: some View {
-        VStack(alignment: .center, spacing: 4) {
-            Text(languageManager.text(.homeFamilyOverview))
-                .font(.title2)
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity, alignment: .center)
-            Text(String(format: languageManager.text(.homeKidsCountFormat), locale: languageManager.locale, arguments: [kids.count]))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .center)
+    private func applyBulkTransaction(
+        type: FamilyBulkTransactionType,
+        amount: Double,
+        note: String,
+        selectedKidIDs: Set<UUID>
+    ) {
+        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard amount > 0, !trimmedNote.isEmpty, !selectedKidIDs.isEmpty else { return }
+
+        let isDeposit = type == .deposit
+        for kid in familyStore.kids where selectedKidIDs.contains(kid.id) {
+            var updatedKid = kid
+            updatedKid.currentBalance = isDeposit
+                ? (updatedKid.currentBalance + amount)
+                : (updatedKid.currentBalance - amount)
+            familyStore.updateKid(updatedKid)
+
+            activityStore.addTransaction(
+                kidId: kid.id,
+                kidName: kid.name,
+                amount: amount,
+                note: trimmedNote,
+                isDeposit: isDeposit
+            )
+            if isDeposit {
+                historyStore.recordManualDeposit(kidId: kid.id, kidName: kid.name, amount: amount, note: trimmedNote)
+            } else {
+                historyStore.recordManualWithdraw(kidId: kid.id, kidName: kid.name, amount: amount, note: trimmedNote)
+            }
         }
+    }
+
+    private var headerSection: some View {
+        Text(languageManager.text(.homeFamilyOverview))
+            .font(.title2)
+            .fontWeight(.semibold)
+            .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private var summaryCard: some View {
@@ -193,10 +291,10 @@ struct HomeView: View {
                 endPoint: .bottomTrailing
             )
         )
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .shadow(color: Color.black.opacity(0.4), radius: 8, x: 0, y: 4)
+        .clipShape(RoundedRectangle(cornerRadius: VeckoCreditCardChrome.cornerRadius, style: .continuous))
+        .shadow(color: VeckoCreditCardChrome.shadowColor, radius: VeckoCreditCardChrome.shadowRadius, x: VeckoCreditCardChrome.shadowX, y: VeckoCreditCardChrome.shadowY)
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: VeckoCreditCardChrome.cornerRadius, style: .continuous)
                 .stroke(
                     LinearGradient(
                         gradient: Gradient(colors: [
@@ -213,7 +311,7 @@ struct HomeView: View {
             cardPhotoOverlay
                 .allowsHitTesting(false)
         }
-        .frame(maxWidth: isIPad ? 450 : .infinity)
+        .frame(maxWidth: isIPad ? VeckoCreditCardChrome.ipadMaxWidth : .infinity)
         .rotation3DEffect(
             .degrees(cardFlipAngle),
             axis: (x: 0, y: 1, z: 0),
@@ -224,38 +322,44 @@ struct HomeView: View {
 
     @ViewBuilder
     private var cardPhotoOverlay: some View {
-        if let data = selectedKid?.customImageData, let uiImage = UIImage(data: data) {
-            VStack {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: isIPad ? 180 : 180, height: isIPad ? 180 : 180)
-                    .clipShape(Circle())
-                    .opacity(0.1)
+        if let kid = selectedKid {
+            if let data = kid.customImageData, let uiImage = UIImage(data: data) {
+                cardWatermark {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                }
+            } else if UIImage(named: kid.icon) != nil {
+                cardWatermark {
+                    Image(kid.icon)
+                        .resizable()
+                        .scaledToFill()
+                }
+            } else {
+                cardWatermark {
+                    Image(systemName: kid.icon)
+                        .font(.system(size: 100, weight: .regular))
+                        .foregroundStyle(.primary.opacity(0.07))
+                }
             }
-            .padding(.top, 4)
-            .frame(maxWidth: .infinity)
         }
+    }
+
+    private func cardWatermark<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack {
+            content()
+                .frame(width: isIPad ? 180 : 180, height: isIPad ? 180 : 180)
+                .clipShape(Circle())
+                .opacity(0.1)
+        }
+        .padding(.top, 4)
+        .frame(maxWidth: .infinity)
     }
 
     private var kidsListSection: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text(languageManager.text(.homeTotalBalance))
-                    .font(.title2)
-                    .fontWeight(.semibold)
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(currencyManager.formatAmount(familyTotalBalance))
-                        .font(.headline)
-                }
-            }
-            .padding(.horizontal, 40)
-            .padding(.top, 10)
-            .padding(.bottom, 20)
-            .background(Color(.systemGroupedBackground))
+            homeTransactionButtons
+                .background(Color(.systemGroupedBackground))
 
             ScrollView {
                 LazyVStack(spacing: 12) {
@@ -273,6 +377,37 @@ struct HomeView: View {
                 .padding(.bottom, 70)
             }
         }
+    }
+
+    private var homeTransactionButtons: some View {
+        HStack(spacing: 12) {
+            Button {
+                activeTransactionType = .deposit
+            } label: {
+                Text(languageManager.text(.familyDeposit))
+                    .font(.headline)
+                    .foregroundColor(kids.isEmpty ? .secondary : .appGreen)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(.appGreen)
+            .disabled(kids.isEmpty)
+
+            Button {
+                activeTransactionType = .withdraw
+            } label: {
+                Text(languageManager.text(.familyWithdraw))
+                    .font(.headline)
+                    .foregroundColor(kids.isEmpty ? .secondary : .red)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(.red)
+            .disabled(kids.isEmpty)
+        }
+        .padding(.horizontal)
+        .padding(.top, 15)
+        .padding(.bottom, 23)
     }
 
     private var emptyStateView: some View {
@@ -338,27 +473,19 @@ private struct KidAllowanceRowView: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            if let data = kid.customImageData, let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 50, height: 50)
-                    .clipShape(Circle())
-            } else {
-                ZStack {
-                    Circle()
-                        .fill(iconColor.opacity(0.15))
-                        .frame(width: 50, height: 50)
-                    Image(systemName: kid.icon)
-                        .font(.title2)
-                        .foregroundColor(iconColor)
-                }
-            }
+            KidStoredIconView(
+                iconName: kid.icon,
+                customImageData: kid.customImageData,
+                size: 50,
+                symbolAccentColor: iconColor
+            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(kid.name)
                     .font(.headline)
                     .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
                 Text(
                     String(
@@ -370,22 +497,18 @@ private struct KidAllowanceRowView: View {
                         ]
                     )
                 )
-                    .font(.subheadline)
+                    .font(.footnote)
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .minimumScaleFactor(0.85)
             }
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
 
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(currencyManager.formatAmount(kid.currentBalance))
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(kid.currentBalance < 0 ? .appRed : .appGreen)
-
-                Text(languageManager.text(.homeCurrent))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+            Text(currencyManager.formatAmount(kid.currentBalance))
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(kid.currentBalance < 0 ? .appRed : .appGreen)
         }
         .padding()
         .background(
@@ -433,5 +556,8 @@ private extension HomeView {
     HomeView()
         .environmentObject(CurrencyManager())
         .environmentObject(FamilyStore())
+        .environmentObject(ActivityStore())
+        .environmentObject(HistoryStore())
+        .environmentObject(GoalsStore())
         .environmentObject(LanguageManager())
 }

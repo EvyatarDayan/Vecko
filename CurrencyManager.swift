@@ -224,8 +224,16 @@ struct CurrencyPickerView: View {
     }
 
     var body: some View {
-        NavigationView {
-            List(filteredCurrencies, id: \.0) { currency in
+        NavigationStack {
+            VStack(spacing: 0) {
+                VeckoPlainSheetBar(
+                    title: languageManager.text(.currencyNavTitle),
+                    leadingTitle: languageManager.text(.commonCancel),
+                    trailingTitle: languageManager.text(.commonDone),
+                    onLeading: { dismiss() },
+                    onTrailing: { dismiss() }
+                )
+                List(filteredCurrencies, id: \.0) { currency in
                 Button {
                     selectedCurrency = currency.0
                     dismiss()
@@ -247,20 +255,8 @@ struct CurrencyPickerView: View {
                 .buttonStyle(.plain)
             }
             .searchable(text: $searchText, prompt: languageManager.text(.currencySearchPrompt))
-            .navigationTitle(languageManager.text(.currencyNavTitle))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(languageManager.text(.commonCancel)) {
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(languageManager.text(.commonDone)) {
-                        dismiss()
-                    }
-                }
             }
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 }

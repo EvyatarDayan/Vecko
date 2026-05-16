@@ -19,7 +19,7 @@ enum AppStringKey {
 
     // Home
     case homeFamilyOverview
-    case homeKidsCountFormat
+    case homeNavEdit
     case homeNoKidSelected
     case homeAllowanceCard
     case homeBalanceNamedFormat
@@ -29,7 +29,6 @@ enum AppStringKey {
     case homeTotalBalance
     case homeNoKidsTitle
     case homeNoKidsSubtitleFamily
-    case homeCurrent
 
     // Family list
     case familyTitle
@@ -43,21 +42,17 @@ enum AppStringKey {
     case familyBulkAmount, familyBulkNote
     case familyBulkAmountRequired, familyBulkNoteRequired, familyBulkKidsRequired
     case familyBulkAdd, familyBulkWithdrawAction
-    case familyKidRowCurrent
 
     // Add / edit kid
-    case kidSectionInfo, kidSectionAllowance, kidSectionIcon
+    case kidSectionDetails, kidSectionAllowance, kidSectionSchedule
+    case kidBirthday, kidBirthdayToday
     case kidNamePlaceholder, kidNameRequired
     case kidWeeklyAllowancePlaceholder, kidWeeklyAllowanceRequired
     case kidDepositFrequency
     case kidDepositTime
-    case kidSelectWeekdayTitle
-    case kidSelectMonthDayTitle
-    case kidSelectedMonthlyFormat
-    case kidDailyAllowanceCaption
     case kidMonthlyInterestHeader
-    case kidMonthlyInterestExplanation
     case kidSelectIcon
+    case kidProfileTapPhoto
     case kidDelete
     case kidNavAdd, kidNavEdit
     case kidDeleteConfirmTitle
@@ -68,12 +63,12 @@ enum AppStringKey {
     case weekdaySun, weekdayMon, weekdayTue, weekdayWed, weekdayThu, weekdayFri, weekdaySat
 
     // Deposit frequency (display)
-    case frequencyDaily, frequencyWeekly, frequencyMonthly
+    case frequencyWeekly, frequencyMonthly
     case allowanceLineFormat
 
     // Icon picker
     case iconPickerIcons, iconPickerPhotos
-    case iconPickerSelectImage, iconPickerChangeImage, iconPickerUseImage
+    case iconPickerSelectImage, iconPickerChangeImage
     case iconPickerNavSelect
     case pickerSelection
 
@@ -81,6 +76,7 @@ enum AppStringKey {
     case goalsTitle, goalsSubtitle
     case goalsAll
     case goalsNoGoalsTitle, goalsNoGoalsSubtitle
+    case goalsNoGoalsForKidTitleFormat, goalsNoGoalsForKidSubtitleFormat
     case goalsNoKidsTitle, goalsNoKidsSubtitle
     case goalsDeleteSwipe
     case goalsPercentCompleteFormat
@@ -90,6 +86,7 @@ enum AppStringKey {
     case goalsTargetPlaceholder, goalsTargetRequired
     case goalsAddPhoto, goalsPhotoRequired
     case goalsNavNew, goalsNavEdit
+    case goalsDeleteFromDetail, goalsDeleteGoalConfirmTitle, goalsDeleteGoalConfirmMessage
 
     // Insights / history UI
     case insightsTitle, insightsSubtitle
@@ -105,6 +102,8 @@ enum AppStringKey {
     case insightsActivityOnFormat
     case insightsClearSelection
     case insightsNoActivityDay
+    case insightsCategoryExpectedAllowance
+    case insightsExpectedAmountFormat
     case insightsNoActivityYet
     case calendarWeekdayShortFormat
     case insightsInterestByKidTitle
@@ -139,9 +138,20 @@ enum AppStringKey {
     case settingsClearTitle, settingsClearSubtitle
     case settingsExportAlertTitle, settingsExportAlertMessage
     case settingsClearAlertTitle, settingsClearAlertMessage
-    case settingsPlaceholderMessage
-    case settingsPlaceholderNavTitle
     case settingsSheetHelpTitle, settingsSheetTermsTitle, settingsSheetAboutTitle
+    case settingsSupportBackHeaderHelp
+    case settingsSupportIntroTitle, settingsSupportIntroLine1, settingsSupportIntroLine2, settingsSupportIntroLine3
+    case settingsSupportEmailLabel, settingsSupportWebsiteLabel
+    case settingsSupportOr, settingsSupportContactForm, settingsSupportAimRespond
+    case settingsSupportNavContact
+    case settingsSupportSectionFullName, settingsSupportPlaceholderFullName
+    case settingsSupportSectionYourEmail, settingsSupportPlaceholderYourEmail
+    case settingsSupportSectionSubject, settingsSupportSectionDescription
+    case settingsSupportSend, settingsSupportAllRequired
+    case settingsSupportAlertSentTitle, settingsSupportAlertSentMessage
+    case settingsSupportAlertMailFail
+    case settingsLegalTabTerms, settingsLegalTabPrivacy, settingsLegalTabDisclaimer
+    case settingsAboutBody, settingsAboutVersionFormat
     case languagePickerTitle
 
     // Common actions
@@ -186,17 +196,16 @@ enum AppStringCatalog {
         case .welcomeGetStarted: return t(language, en: "Get started", sv: "Kom igång", es: "Empezar", fr: "Commencer", de: "Loslegen")
 
         case .homeFamilyOverview: return t(language, en: "Family Overview", sv: "Familjöversikt", es: "Resumen familiar", fr: "Aperçu de la famille", de: "Familienübersicht")
-        case .homeKidsCountFormat: return t(language, en: "%d kids in your account", sv: "%d barn i ditt konto", es: "%d niños en tu cuenta", fr: "%d enfants dans votre compte", de: "%d Kinder in deinem Konto")
+        case .homeNavEdit: return t(language, en: "Edit", sv: "Redigera", es: "Editar", fr: "Modifier", de: "Bearbeiten")
         case .homeNoKidSelected: return t(language, en: "No kid selected", sv: "Inget barn valt", es: "Ningún niño seleccionado", fr: "Aucun enfant sélectionné", de: "Kein Kind ausgewählt")
         case .homeAllowanceCard: return t(language, en: "Allowance Card", sv: "Veckopengskort", es: "Tarjeta de paga", fr: "Carte d’argent de poche", de: "Taschengeldkarte")
         case .homeBalanceNamedFormat: return t(language, en: "%@'s balance", sv: "%@s saldo", es: "Saldo de %@", fr: "Solde de %@", de: "Guthaben von %@")
         case .homeCurrentBalance: return t(language, en: "Current balance", sv: "Aktuellt saldo", es: "Saldo actual", fr: "Solde actuel", de: "Aktuelles Guthaben")
-        case .homeAllowanceFrequencyFormat: return t(language, en: "%@ allowance %@", sv: "%@ veckopeng %@", es: "Paga %@ %@", fr: "Poche %@ %@", de: "%@ Taschengeld %@")
+        case .homeAllowanceFrequencyFormat: return t(language, en: "%@ %@", sv: "%@ %@", es: "%@ %@", fr: "%@ %@", de: "%@ %@")
         case .homeCardBrand: return t(language, en: "Mastercard", sv: "Mastercard", es: "Mastercard", fr: "Mastercard", de: "Mastercard")
         case .homeTotalBalance: return t(language, en: "Total balance", sv: "Totalt saldo", es: "Saldo total", fr: "Solde total", de: "Gesamtguthaben")
         case .homeNoKidsTitle: return t(language, en: "No kids yet", sv: "Inga barn ännu", es: "Aún no hay niños", fr: "Pas encore d’enfants", de: "Noch keine Kinder")
         case .homeNoKidsSubtitleFamily: return t(language, en: "Tap + in the Family tab to add your first allowance details.", sv: "Tryck på + under Familj för att lägga till ditt första veckopengs­upplägg.", es: "Toca + en Familia para añadir tu primera paga.", fr: "Appuyez sur + dans Famille pour ajouter la première allocation.", de: "Tippe in „Familie“ auf +, um dein erstes Taschengeld anzulegen.")
-        case .homeCurrent: return t(language, en: "Current", sv: "Aktuellt", es: "Actual", fr: "Actuel", de: "Aktuell")
 
         case .familyTitle: return t(language, en: "Family", sv: "Familj", es: "Familia", fr: "Famille", de: "Familie")
         case .familySubtitle: return t(language, en: "Manage your kids’ allowance details", sv: "Hantera barnens veckopengar", es: "Gestiona los detalles de la paga", fr: "Gérez les allocations de vos enfants", de: "Verwalte die Taschengeld‑Details deiner Kinder")
@@ -211,26 +220,23 @@ enum AppStringCatalog {
         case .familyBulkAmountRequired: return t(language, en: "Amount is required", sv: "Belopp krävs", es: "El importe es obligatorio", fr: "Le montant est requis", de: "Betrag ist erforderlich")
         case .familyBulkNoteRequired: return t(language, en: "Note is required", sv: "Anteckning krävs", es: "La nota es obligatoria", fr: "La note est requise", de: "Notiz ist erforderlich")
         case .familyBulkKidsRequired: return t(language, en: "Select at least one kid", sv: "Välj minst ett barn", es: "Selecciona al menos un niño", fr: "Sélectionnez au moins un enfant", de: "Mindestens ein Kind auswählen")
-        case .familyBulkAdd: return t(language, en: "Add", sv: "Lägg till", es: "Añadir", fr: "Ajouter", de: "Hinzufügen")
+        case .familyBulkAdd: return t(language, en: "Deposit", sv: "Sätt in", es: "Ingresar", fr: "Dépôt", de: "Einzahlen")
         case .familyBulkWithdrawAction: return t(language, en: "Withdraw", sv: "Ta ut", es: "Retirar", fr: "Retirer", de: "Abheben")
-        case .familyKidRowCurrent: return t(language, en: "Current", sv: "Aktuellt", es: "Actual", fr: "Actuel", de: "Aktuell")
 
-        case .kidSectionInfo: return t(language, en: "Kid Information", sv: "Barnuppgifter", es: "Información del niño", fr: "Informations sur l’enfant", de: "Kind‑Informationen")
+        case .kidSectionDetails: return t(language, en: "Kid details", sv: "Barnuppgifter", es: "Datos del niño", fr: "Détails de l’enfant", de: "Kinddetails")
         case .kidSectionAllowance: return t(language, en: "Allowance", sv: "Veckopeng", es: "Paga", fr: "Argent de poche", de: "Taschengeld")
-        case .kidSectionIcon: return t(language, en: "Icon", sv: "Ikon", es: "Icono", fr: "Icône", de: "Symbol")
+        case .kidSectionSchedule: return t(language, en: "Pay day", sv: "Utbetalningsdag", es: "Día de pago", fr: "Jour de paie", de: "Zahltag")
+        case .kidBirthday: return t(language, en: "Birthday", sv: "Födelsedag", es: "Cumpleaños", fr: "Date de naissance", de: "Geburtsdatum")
+        case .kidBirthdayToday: return t(language, en: "Happy Birthday!!! 🎁", sv: "Grattis på födelsedagen!!! 🎁", es: "¡Feliz cumpleaños!!! 🎁", fr: "Joyeux anniversaire !!! 🎁", de: "Herzlichen Glückwunsch zum Geburtstag!!! 🎁")
         case .kidNamePlaceholder: return t(language, en: "Kid name", sv: "Barnets namn", es: "Nombre del niño", fr: "Nom de l’enfant", de: "Name des Kindes")
         case .kidNameRequired: return t(language, en: "Kid name is required", sv: "Barnets namn krävs", es: "El nombre es obligatorio", fr: "Le nom est requis", de: "Name ist erforderlich")
         case .kidWeeklyAllowancePlaceholder: return t(language, en: "Weekly allowance", sv: "Veckopeng", es: "Paga semanal", fr: "Allocation hebdomadaire", de: "Wöchentliches Taschengeld")
         case .kidWeeklyAllowanceRequired: return t(language, en: "Weekly allowance is required", sv: "Veckopeng krävs", es: "La paga semanal es obligatoria", fr: "L’allocation hebdomadaire est requise", de: "Wöchentliches Taschengeld ist erforderlich")
         case .kidDepositFrequency: return t(language, en: "Deposit frequency", sv: "Insättningsfrekvens", es: "Frecuencia de ingreso", fr: "Fréquence du versement", de: "Auszahlungsrhythmus")
         case .kidDepositTime: return t(language, en: "Deposit time", sv: "Insättningstid", es: "Hora del ingreso", fr: "Heure du versement", de: "Auszahlungszeit")
-        case .kidSelectWeekdayTitle: return t(language, en: "Select day of week", sv: "Välj veckodag", es: "Elige el día de la semana", fr: "Choisir le jour de la semaine", de: "Wochentag wählen")
-        case .kidSelectMonthDayTitle: return t(language, en: "Select the day of the month", sv: "Välj dag i månaden", es: "Elige el día del mes", fr: "Choisir le jour du mois", de: "Tag im Monat wählen")
-        case .kidSelectedMonthlyFormat: return t(language, en: "Selected: %@ of every month", sv: "Valt: %@ varje månad", es: "Seleccionado: %@ de cada mes", fr: "Choisi : %@ chaque mois", de: "Ausgewählt: %@ jeden Monats")
-        case .kidDailyAllowanceCaption: return t(language, en: "Allowance is deposited every day.", sv: "Veckopeng sätts in varje dag.", es: "La paga se ingresa cada día.", fr: "L’allocation est versée chaque jour.", de: "Das Taschengeld wird täglich gutgeschrieben.")
         case .kidMonthlyInterestHeader: return t(language, en: "Monthly interest", sv: "Månadsränta", es: "Interés mensual", fr: "Intérêts mensuels", de: "Monatszins")
-        case .kidMonthlyInterestExplanation: return t(language, en: "On the 1st of each month, interest is added to this kid’s current balance (e.g. 100 at 2% → 102).", sv: "Den 1:a varje månad läggs ränta till barnets saldo (t.ex. 100 vid 2% → 102).", es: "El día 1 de cada mes se añade interés al saldo (p. ej., 100 al 2% → 102).", fr: "Le 1er de chaque mois, des intérêts sont ajoutés au solde (ex. 100 à 2% → 102).", de: "Am 1. jedes Monats wird Zins auf das Guthaben gutgeschrieben (z. B. 100 bei 2% → 102).")
         case .kidSelectIcon: return t(language, en: "Select", sv: "Välj", es: "Elegir", fr: "Choisir", de: "Auswählen")
+        case .kidProfileTapPhoto: return t(language, en: "Tap photo to change", sv: "Tryck på bilden för att byta", es: "Toca la foto para cambiar", fr: "Touchez la photo pour changer", de: "Tippe auf das Foto zum Ändern")
         case .kidDelete: return t(language, en: "Delete Kid", sv: "Ta bort barn", es: "Eliminar niño", fr: "Supprimer l’enfant", de: "Kind löschen")
         case .kidNavAdd: return t(language, en: "Add Kid", sv: "Lägg till barn", es: "Añadir niño", fr: "Ajouter un enfant", de: "Kind hinzufügen")
         case .kidNavEdit: return t(language, en: "Edit Kid", sv: "Redigera barn", es: "Editar niño", fr: "Modifier l’enfant", de: "Kind bearbeiten")
@@ -246,16 +252,14 @@ enum AppStringCatalog {
         case .weekdayFri: return t(language, en: "Friday", sv: "Fredag", es: "Viernes", fr: "Vendredi", de: "Freitag")
         case .weekdaySat: return t(language, en: "Saturday", sv: "Lördag", es: "Sábado", fr: "Samedi", de: "Samstag")
 
-        case .frequencyDaily: return t(language, en: "Daily", sv: "Dagligen", es: "Diaria", fr: "Quotidien", de: "Täglich")
         case .frequencyWeekly: return t(language, en: "Weekly", sv: "Veckovis", es: "Semanal", fr: "Hebdomadaire", de: "Wöchentlich")
         case .frequencyMonthly: return t(language, en: "Monthly", sv: "Månadsvis", es: "Mensual", fr: "Mensuel", de: "Monatlich")
-        case .allowanceLineFormat: return t(language, en: "%@ allowance %@", sv: "%@ veckopeng %@", es: "Paga %@ %@", fr: "Poche %@ %@", de: "%@ Taschengeld %@")
+        case .allowanceLineFormat: return t(language, en: "%@ %@", sv: "%@ %@", es: "%@ %@", fr: "%@ %@", de: "%@ %@")
 
-        case .iconPickerIcons: return t(language, en: "Icons", sv: "Ikoner", es: "Iconos", fr: "Icônes", de: "Symbole")
+        case .iconPickerIcons: return t(language, en: "Avatars", sv: "Avatarer", es: "Avatares", fr: "Avatars", de: "Avatare")
         case .iconPickerPhotos: return t(language, en: "Photos", sv: "Foton", es: "Fotos", fr: "Photos", de: "Fotos")
         case .iconPickerSelectImage: return t(language, en: "Select image", sv: "Välj bild", es: "Elegir imagen", fr: "Choisir une image", de: "Bild auswählen")
         case .iconPickerChangeImage: return t(language, en: "Change image", sv: "Byt bild", es: "Cambiar imagen", fr: "Changer l’image", de: "Bild ändern")
-        case .iconPickerUseImage: return t(language, en: "Use this image", sv: "Använd bilden", es: "Usar esta imagen", fr: "Utiliser cette image", de: "Dieses Bild verwenden")
         case .iconPickerNavSelect: return t(language, en: "Select", sv: "Välj", es: "Seleccionar", fr: "Sélectionner", de: "Auswählen")
         case .pickerSelection: return t(language, en: "Selection", sv: "Val", es: "Selección", fr: "Sélection", de: "Auswahl")
 
@@ -264,6 +268,8 @@ enum AppStringCatalog {
         case .goalsAll: return t(language, en: "All", sv: "Alla", es: "Todos", fr: "Tous", de: "Alle")
         case .goalsNoGoalsTitle: return t(language, en: "No goals yet", sv: "Inga mål ännu", es: "Aún no hay metas", fr: "Pas encore d’objectifs", de: "Noch keine Ziele")
         case .goalsNoGoalsSubtitle: return t(language, en: "Add a goal and track progress by balance.", sv: "Lägg till ett mål och följ hur saldot rör sig mot målet.", es: "Añade una meta y mira el avance según el saldo.", fr: "Ajoutez un objectif et suivez la progression via le solde.", de: "Lege ein Ziel an und verfolge den Fortschritt am Guthaben.")
+        case .goalsNoGoalsForKidTitleFormat: return t(language, en: "No goals for %@", sv: "Inga mål för %@", es: "No hay metas para %@", fr: "Aucun objectif pour %@", de: "Keine Ziele für %@")
+        case .goalsNoGoalsForKidSubtitleFormat: return t(language, en: "Add a new goal and track progress with %@’s balance.", sv: "Lägg till ett nytt mål och följ framstegen med %@s saldo.", es: "Añade una meta nueva y sigue el avance con el saldo de %@.", fr: "Ajoutez un nouvel objectif et suivez la progression avec le solde de %@.", de: "Lege ein neues Ziel an und verfolge den Fortschritt am Guthaben von %@.")
         case .goalsNoKidsTitle: return t(language, en: "No kids yet", sv: "Inga barn ännu", es: "Aún no hay niños", fr: "Pas encore d’enfants", de: "Noch keine Kinder")
         case .goalsNoKidsSubtitle: return t(language, en: "Add a kid in Family before creating goals.", sv: "Lägg till ett barn under Familj innan du skapar mål.", es: "Añade un niño en Familia antes de crear metas.", fr: "Ajoutez un enfant dans Famille avant de créer des objectifs.", de: "Füge unter „Familie“ ein Kind hinzu, bevor du Ziele anlegst.")
         case .goalsDeleteSwipe: return t(language, en: "Delete", sv: "Ta bort", es: "Eliminar", fr: "Supprimer", de: "Löschen")
@@ -279,6 +285,9 @@ enum AppStringCatalog {
         case .goalsPhotoRequired: return t(language, en: "Photo or icon is required", sv: "Foto eller ikon krävs", es: "Se requiere foto o icono", fr: "Photo ou icône requise", de: "Foto oder Symbol erforderlich")
         case .goalsNavNew: return t(language, en: "New Goal", sv: "Nytt mål", es: "Nueva meta", fr: "Nouvel objectif", de: "Neues Ziel")
         case .goalsNavEdit: return t(language, en: "Edit Goal", sv: "Redigera mål", es: "Editar meta", fr: "Modifier l’objectif", de: "Ziel bearbeiten")
+        case .goalsDeleteFromDetail: return t(language, en: "Delete goal", sv: "Ta bort mål", es: "Eliminar meta", fr: "Supprimer l’objectif", de: "Ziel löschen")
+        case .goalsDeleteGoalConfirmTitle: return t(language, en: "Delete this goal?", sv: "Ta bort detta mål?", es: "¿Eliminar esta meta?", fr: "Supprimer cet objectif ?", de: "Dieses Ziel löschen?")
+        case .goalsDeleteGoalConfirmMessage: return t(language, en: "This goal will be removed from your list. This cannot be undone.", sv: "Målet tas bort från listan. Detta kan inte ångras.", es: "La meta se eliminará de la lista. No se puede deshacer.", fr: "Cet objectif sera retiré de la liste. Action irréversible.", de: "Das Ziel wird aus der Liste entfernt. Das kann nicht rückgängig gemacht werden.")
 
         case .insightsTitle: return t(language, en: "Insights", sv: "Insikter", es: "Resumen", fr: "Analyses", de: "Einblicke")
         case .insightsSubtitle: return t(language, en: "Review activity, history, and trends", sv: "Se aktivitet, historik och trender", es: "Revisa actividad, historial y tendencias", fr: "Consultez l’activité, l’historique et les tendances", de: "Aktivität, Verlauf und Trends ansehen")
@@ -301,6 +310,8 @@ enum AppStringCatalog {
         case .insightsActivityOnFormat: return t(language, en: "Activity on %@", sv: "Aktivitet den %@", es: "Actividad el %@", fr: "Activité du %@", de: "Aktivität am %@")
         case .insightsClearSelection: return t(language, en: "Clear", sv: "Rensa", es: "Borrar", fr: "Effacer", de: "Zurücksetzen")
         case .insightsNoActivityDay: return t(language, en: "No allowance activity on this day", sv: "Ingen veckopengsaktivitet denna dag", es: "Sin actividad de paga este día", fr: "Pas d’activité d’allocation ce jour-là", de: "Keine Taschengeld‑Aktivität an diesem Tag")
+        case .insightsCategoryExpectedAllowance: return t(language, en: "Expected allowance", sv: "Förväntad veckopeng", es: "Paga prevista", fr: "Allocation prévue", de: "Erwartetes Taschengeld")
+        case .insightsExpectedAmountFormat: return t(language, en: "Expected %@", sv: "Förväntat %@", es: "Previsto %@", fr: "Prévu %@", de: "Erwartet %@")
         case .insightsNoActivityYet: return t(language, en: "No activity yet", sv: "Ingen aktivitet ännu", es: "Aún no hay actividad", fr: "Pas encore d’activité", de: "Noch keine Aktivität")
         case .calendarWeekdayShortFormat: return t(language, en: "EEE", sv: "EEE", es: "EEE", fr: "EEE", de: "EEE")
         case .insightsInterestByKidTitle: return t(language, en: "Interest", sv: "Ränta", es: "Intereses", fr: "Intérêts", de: "Zinsen")
@@ -348,11 +359,36 @@ enum AppStringCatalog {
         case .settingsExportAlertMessage: return t(language, en: "This is a placeholder. Export will be connected later.", sv: "Detta är en placeholder. Export kopplas på senare.", es: "Esto es una demostración. La exportación llegará después.", fr: "Ceci est un emplacement. L’export viendra plus tard.", de: "Das ist nur ein Platzhalter. Export folgt später.")
         case .settingsClearAlertTitle: return t(language, en: "Clear all data?", sv: "Rensa all data?", es: "¿Borrar todos los datos?", fr: "Effacer toutes les données ?", de: "Alle Daten löschen?")
         case .settingsClearAlertMessage: return t(language, en: "This is a placeholder. Clearing data will be connected later.", sv: "Detta är en placeholder. Radering kopplas på senare.", es: "Esto es una demostración. El borrado llegará después.", fr: "Ceci est un emplacement. La suppression viendra plus tard.", de: "Das ist nur ein Platzhalter. Löschen folgt später.")
-        case .settingsPlaceholderMessage: return t(language, en: "This screen is a placeholder.", sv: "Den här skärmen är en placeholder.", es: "Esta pantalla es temporal.", fr: "Cet écran est temporaire.", de: "Dieser Bildschirm ist ein Platzhalter.")
-        case .settingsPlaceholderNavTitle: return t(language, en: "Preview", sv: "Förhandsvisning", es: "Vista previa", fr: "Aperçu", de: "Vorschau")
         case .settingsSheetHelpTitle: return t(language, en: "Help & Support", sv: "Hjälp och support", es: "Ayuda y soporte", fr: "Aide et support", de: "Hilfe & Support")
         case .settingsSheetTermsTitle: return t(language, en: "Terms & Privacy", sv: "Villkor och integritet", es: "Términos y privacidad", fr: "Conditions et confidentialité", de: "AGB & Datenschutz")
         case .settingsSheetAboutTitle: return t(language, en: "About Vecko", sv: "Om Vecko", es: "Acerca de Vecko", fr: "À propos de Vecko", de: "Über Vecko")
+        case .settingsSupportBackHeaderHelp: return t(language, en: "Help and support", sv: "Hjälp och support", es: "Ayuda y soporte", fr: "Aide et support", de: "Hilfe und Support")
+        case .settingsSupportIntroTitle: return t(language, en: "We’d love to hear from you!", sv: "Vi vill gärna höra från dig!", es: "¡Nos encantaría saber de ti!", fr: "Nous serions ravis de vous lire !", de: "Wir freuen uns auf deine Nachricht!")
+        case .settingsSupportIntroLine1: return t(language, en: "Whether you have questions,", sv: "Oavsett om du har frågor,", es: "Tanto si tienes preguntas,", fr: "Que vous ayez des questions,", de: "Ob du Fragen hast,")
+        case .settingsSupportIntroLine2: return t(language, en: "feedback, or just want to say hi,", sv: "synpunkter eller bara vill säga hej,", es: "comentarios o solo quieres saludar,", fr: "des retours ou simplement envie de dire bonjour,", de: "Feedback hast oder nur Hallo sagen willst,")
+        case .settingsSupportIntroLine3: return t(language, en: "feel free to reach out.", sv: "är du välkommen att höra av dig.", es: "escríbenos cuando quieras.", fr: "contactez-nous.", de: "melde dich gern.")
+        case .settingsSupportEmailLabel: return t(language, en: "Email", sv: "E-post", es: "Correo", fr: "E-mail", de: "E-Mail")
+        case .settingsSupportWebsiteLabel: return t(language, en: "Website", sv: "Webbplats", es: "Sitio web", fr: "Site web", de: "Website")
+        case .settingsSupportOr: return t(language, en: "OR", sv: "ELLER", es: "O", fr: "OU", de: "ODER")
+        case .settingsSupportContactForm: return t(language, en: "Contact form", sv: "Kontaktformulär", es: "Formulario de contacto", fr: "Formulaire de contact", de: "Kontaktformular")
+        case .settingsSupportAimRespond: return t(language, en: "We aim to respond within 24 hours.", sv: "Vi strävar efter att svara inom 24 timmar.", es: "Intentamos responder en 24 horas.", fr: "Nous essayons de répondre sous 24 h.", de: "Wir antworten in der Regel innerhalb von 24 Stunden.")
+        case .settingsSupportNavContact: return t(language, en: "Contact us", sv: "Kontakta oss", es: "Contáctanos", fr: "Nous contacter", de: "Kontakt")
+        case .settingsSupportSectionFullName: return t(language, en: "Your full name", sv: "Ditt fullständiga namn", es: "Tu nombre completo", fr: "Votre nom complet", de: "Dein vollständiger Name")
+        case .settingsSupportPlaceholderFullName: return t(language, en: "Full name", sv: "Fullständigt namn", es: "Nombre completo", fr: "Nom complet", de: "Vollständiger Name")
+        case .settingsSupportSectionYourEmail: return t(language, en: "Your Email", sv: "Din e-post", es: "Tu correo", fr: "Votre e-mail", de: "Deine E-Mail")
+        case .settingsSupportPlaceholderYourEmail: return t(language, en: "Email", sv: "E-post", es: "Correo", fr: "E-mail", de: "E-Mail")
+        case .settingsSupportSectionSubject: return t(language, en: "Subject", sv: "Ämne", es: "Asunto", fr: "Objet", de: "Betreff")
+        case .settingsSupportSectionDescription: return t(language, en: "Description", sv: "Beskrivning", es: "Descripción", fr: "Description", de: "Beschreibung")
+        case .settingsSupportSend: return t(language, en: "Send", sv: "Skicka", es: "Enviar", fr: "Envoyer", de: "Senden")
+        case .settingsSupportAllRequired: return t(language, en: "All fields are required.", sv: "Alla fält är obligatoriska.", es: "Todos los campos son obligatorios.", fr: "Tous les champs sont requis.", de: "Alle Felder sind erforderlich.")
+        case .settingsSupportAlertSentTitle: return t(language, en: "Message ready", sv: "Meddelande klart", es: "Mensaje listo", fr: "Message prêt", de: "Nachricht bereit")
+        case .settingsSupportAlertSentMessage: return t(language, en: "Your mail app should open with your message. If it does not, email us using the address shown above.", sv: "Din e-postapp ska öppnas med ditt meddelande. Om inte, mejla oss med adressen ovan.", es: "Se abrirá tu app de correo con el mensaje. Si no, escríbenos con la dirección indicada.", fr: "Votre app Mail devrait s’ouvrir. Sinon, écrivez-nous à l’adresse ci-dessus.", de: "Die Mail-App sollte sich mit deiner Nachricht öffnen. Sonst schreib uns an die Adresse oben.")
+        case .settingsSupportAlertMailFail: return t(language, en: "Could not open Mail. Please email us at %@", sv: "Kunde inte öppna Mail. Mejla oss på %@", es: "No se pudo abrir Mail. Escríbenos a %@", fr: "Impossible d’ouvrir Mail. Écrivez-nous à %@", de: "Mail konnte nicht geöffnet werden. Schreib uns an %@")
+        case .settingsLegalTabTerms: return t(language, en: "Terms", sv: "Villkor", es: "Términos", fr: "Conditions", de: "Bedingungen")
+        case .settingsLegalTabPrivacy: return t(language, en: "Privacy", sv: "Integritet", es: "Privacidad", fr: "Confidentialité", de: "Datenschutz")
+        case .settingsLegalTabDisclaimer: return t(language, en: "Disclaimer", sv: "Ansvarsfriskrivning", es: "Aviso legal", fr: "Avertissement", de: "Haftungsausschluss")
+        case .settingsAboutBody: return t(language, en: "Vecko is for parents and carers who want pocket money under control. For each child you set a weekly amount, how deposits run (daily, weekly on a chosen weekday, or monthly on a chosen day), and optional simple interest credited on the 1st of every month. Log extra deposits and withdrawals, savings goals with targets and optional photos, and review a full history that includes scheduled allowances and interest. Home, Family, Goals, and Insights show balances, bulk actions, goal progress, and month-by-month activity. Everything stays on your device in the currency and language you pick, and you can export a PDF when you need a record to keep or share.", sv: "Vecko är för vuxna som vill ha koll på barnens veckopeng. För varje barn anger du belopp, hur insättningar sker (varje dag, en vald veckodag eller en vald dag i månaden) samt valfri enkel månadsränta som läggs till den 1:a varje månad. Du bokför extra insättningar och uttag, sparmål med målbelopp och valfria foton, och följer historik med schemalagda utbetalningar och ränta. Hem, Familj, Mål och Insikter visar saldon, snabbåtgärder, målframsteg och aktivitet per månad. Allt finns på din enhet i den valuta och det språk du väljer, och du kan exportera en PDF när du vill spara eller dela en sammanställning.", es: "Vecko está pensado para padres y cuidadores que quieren ordenar la paga de los niños. En cada hijo defines el importe semanal, la frecuencia de los ingresos (cada día, semanal con un día fijo o mensual con un día del mes) y un interés mensual opcional que se abona el día 1. Registra ingresos y retiros extra, metas de ahorro con objetivo y fotos opcionales, y revisa el historial con pagas programadas e intereses. Inicio, Familia, Metas y Resumen muestran saldos, acciones rápidas, avance de metas y actividad mes a mes. Los datos permanecen en tu dispositivo con la moneda e idioma que elijas, y puedes exportar un PDF cuando necesites un archivo para archivar o compartir.", fr: "Vecko s’adresse aux parents et aidants qui veulent suivre l’argent de poche au quotidien. Pour chaque enfant vous définissez le montant hebdomadaire, le rythme des versements (chaque jour, chaque semaine un jour fixe, ou chaque mois un jour du mois) et des intérêts mensuels simples facultatifs crédités le 1er. Vous enregistrez dépôts et retraits ponctuels, des objectifs d’épargne avec cible et photos optionnelles, et consultez l’historique avec allocations planifiées et intérêts. Accueil, Famille, Objectifs et Analyses regroupent soldes, actions groupées, progression et activité mois par mois. Les données restent sur l’appareil dans la devise et la langue choisies, et vous pouvez exporter un PDF pour archiver ou partager.", de: "Vecko richtet sich an Eltern und Betreuungspersonen, die Taschengeld transparent im Blick behalten wollen. Pro Kind legst du den Wochenbetrag fest, wie Auszahlungen laufen (täglich, wöchentlich an einem Wochentag oder monatlich an einem Kalendertag) sowie optional einfachen Monatszins, der jeweils am 1. gutgeschrieben wird. Du erfasst zusätzliche Ein- und Auszahlungen, Sparziele mit Zielbetrag und optionalen Fotos und siehst die Historie inklusive geplantem Taschengeld und Zinsen. Start, Familie, Ziele und Einblicke zeigen Salden, Sammelaktionen, Zielfortschritt und Aktivität monatsweise. Alles bleibt auf deinem Gerät in deiner Währung und Sprache; als PDF kannst du eine Übersicht exportieren, um sie zu archivieren oder zu teilen.")
+        case .settingsAboutVersionFormat: return t(language, en: "Version %@ (%@)", sv: "Version %@ (%@)", es: "Versión %@ (%@)", fr: "Version %@ (%@)", de: "Version %@ (%@)")
         case .languagePickerTitle: return t(language, en: "Language", sv: "Språk", es: "Idioma", fr: "Langue", de: "Sprache")
 
         case .commonCancel: return t(language, en: "Cancel", sv: "Avbryt", es: "Cancelar", fr: "Annuler", de: "Abbrechen")
@@ -398,7 +434,6 @@ enum AppStringCatalog {
 
     static func displayDepositFrequency(_ frequency: DepositFrequency, language: AppLanguage) -> String {
         switch frequency {
-        case .daily: return string(.frequencyDaily, language: language)
         case .weekly: return string(.frequencyWeekly, language: language)
         case .monthly: return string(.frequencyMonthly, language: language)
         }
