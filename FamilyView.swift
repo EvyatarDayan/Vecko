@@ -247,201 +247,8 @@ final class FamilyStore: ObservableObject {
 }
 
 struct FamilyView: View {
-    @AppStorage("isDarkMode") private var isDarkMode: Bool = false
-    @EnvironmentObject var languageManager: LanguageManager
-    @EnvironmentObject var currencyManager: CurrencyManager
-    @EnvironmentObject var familyStore: FamilyStore
-    @EnvironmentObject var activityStore: ActivityStore
-    @EnvironmentObject var historyStore: HistoryStore
-    @EnvironmentObject var goalsStore: GoalsStore
-    @State private var showingAddKid = false
-    @State private var editingKid: FamilyKid?
-    @State private var activeTransactionType: FamilyBulkTransactionType?
-
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .topTrailing) {
-                VStack(spacing: 0) {
-                    pageHeader
-                    transactionButtons
-
-                    if kids.isEmpty {
-                        emptyStateView
-                    } else {
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                ForEach(kids) { kid in
-                                    FamilyKidRow(kid: kid, isDarkMode: isDarkMode)
-                                        .onTapGesture {
-                                            editingKid = kid
-                                        }
-                                }
-                            }
-                            .padding(.horizontal)
-                            .padding(.bottom, 70)
-                        }
-                    }
-                }
-                Button {
-                    showingAddKid = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(Color.appGreen)
-                }
-                .veckoToolbarActionStyle()
-                .padding(.top, 6)
-                .padding(.trailing, 20)
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showingAddKid) {
-                AddEditKidView(mode: .add, onDelete: nil) { newKid in
-                    familyStore.addKid(newKid)
-                    historyStore.recordKidAdded(kidId: newKid.id, kidName: newKid.name)
-                }
-            }
-            .sheet(item: $activeTransactionType) { type in
-                FamilyBulkTransactionView(type: type) { amount, note, selectedKidIDs in
-                    applyBulkTransaction(type: type, amount: amount, note: note, selectedKidIDs: selectedKidIDs)
-                }
-                .environmentObject(currencyManager)
-                .environmentObject(familyStore)
-            }
-            .sheet(item: $editingKid) { kid in
-                AddEditKidView(
-                    mode: .edit(kid),
-                    onDelete: { deletedID, deletedName in
-                        familyStore.deleteKid(id: deletedID)
-                        activityStore.removeAll(forKidId: deletedID)
-                        goalsStore.removeGoals(forKidId: deletedID)
-                        historyStore.recordKidRemoved(kidId: deletedID, kidName: deletedName)
-                    }
-                ) { updatedKid in
-                    familyStore.updateKid(updatedKid)
-                    historyStore.recordKidUpdated(kidId: updatedKid.id, kidName: updatedKid.name)
-                }
-            }
-        }
-    }
-
-
-    private var pageHeader: some View {
-        VStack(alignment: .center, spacing: 4) {
-            Text(languageManager.text(.familyTitle))
-                .font(.title2)
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity, alignment: .center)
-            Text(languageManager.text(.familySubtitle))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .padding(.horizontal)
-         .padding(.top, 15)
-         .padding(.bottom, 6)
-    }
-
-    private var transactionButtons: some View {
-        HStack(spacing: 12) {
-            Button {
-                activeTransactionType = .deposit
-            } label: {
-                Text(languageManager.text(.familyDeposit))
-                    .font(.headline)
-                    .foregroundColor(kids.isEmpty ? .secondary : .appGreen)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .tint(.appGreen)
-            .disabled(kids.isEmpty)
-
-            Button {
-                activeTransactionType = .withdraw
-            } label: {
-                Text(languageManager.text(.familyWithdraw))
-                    .font(.headline)
-                    .foregroundColor(kids.isEmpty ? .secondary : .red)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .tint(.red)
-            .disabled(kids.isEmpty)
-        }
-        .padding(.horizontal)
-        .padding(.top, 15)
-        .padding(.bottom, 23)
-    }
-
-    private var emptyStateView: some View {
-        VStack(spacing: 14) {
-            Spacer()
-            Image(systemName: "person.3.sequence.fill")
-                .font(.system(size: 44))
-                .foregroundStyle(.secondary)
-            Text(languageManager.text(.familyNoKidsTitle))
-                .font(.headline)
-            Text(languageManager.text(.familyNoKidsSubtitle))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
-
-            Button {
-                showingAddKid = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(width: 42, height: 42)
-                    .background(Color.appGreen)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var totalBalance: Double {
-        kids.reduce(0) { $0 + $1.currentBalance }
-    }
-
-    private var kids: [FamilyKid] {
-        familyStore.kids
-    }
-
-    private func applyBulkTransaction(
-        type: FamilyBulkTransactionType,
-        amount: Double,
-        note: String,
-        selectedKidIDs: Set<UUID>
-    ) {
-        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard amount > 0, !trimmedNote.isEmpty, !selectedKidIDs.isEmpty else { return }
-
-        let isDeposit = type == .deposit
-        for kid in kids where selectedKidIDs.contains(kid.id) {
-            var updatedKid = kid
-            updatedKid.currentBalance = isDeposit
-                ? (updatedKid.currentBalance + amount)
-                : (updatedKid.currentBalance - amount)
-            familyStore.updateKid(updatedKid)
-
-            activityStore.addTransaction(
-                kidId: kid.id,
-                kidName: kid.name,
-                amount: amount,
-                note: trimmedNote,
-                isDeposit: isDeposit
-            )
-            if isDeposit {
-                historyStore.recordManualDeposit(kidId: kid.id, kidName: kid.name, amount: amount, note: trimmedNote)
-            } else {
-                historyStore.recordManualWithdraw(kidId: kid.id, kidName: kid.name, amount: amount, note: trimmedNote)
-            }
-        }
+        HistoryView()
     }
 }
 
@@ -1051,6 +858,9 @@ struct AddEditKidView: View {
         case edit(FamilyKid)
     }
 
+    /// Matches the green allowance amount inner frame.
+    private static let contentCornerRadius: CGFloat = 10
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var languageManager: LanguageManager
@@ -1072,29 +882,19 @@ struct AddEditKidView: View {
     @State private var birthdayPickerDate = Self.fixedBirthdayPlaceholder
     @State private var birthdayIsSet = false
     @State private var suppressBirthdayPickerSync = false
-    @State private var depositFrequency: DepositFrequency = .weekly
     @State private var selectedWeekday = 2
-    @State private var selectedMonthlyDay = 1
     @State private var depositTime = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     @State private var showingDepositTimePicker = false
     @State private var showingDeleteConfirmation = false
     @State private var monthlyInterestPercent = 1
     @State private var attemptedSave = false
 
-    /// Month + day of `birth` matches that of `reference` (same calendar day each year). Uses the autoupdating calendar so locale / timezone changes apply.
-    private func isKidBirthdaySameMonthDayAsReference(birth: Date, reference: Date) -> Bool {
-        let cal = Calendar.autoupdatingCurrent
-        let ref = cal.dateComponents([.month, .day], from: reference)
-        let bd = cal.dateComponents([.month, .day], from: birth)
-        return ref.month == bd.month && ref.day == bd.day
-    }
-
     /// "Happy Birthday" when a birthday is set and its month/day matches **today** (all day until the next calendar day). `referenceNow` comes from `TimelineView` so the label can update at midnight while this screen is open.
     private func birthdayRowLabelText(referenceNow: Date) -> String {
         guard birthdayIsSet, let b = birthday else {
             return languageManager.text(.kidBirthday)
         }
-        if isKidBirthdaySameMonthDayAsReference(birth: b, reference: referenceNow) {
+        if FamilyKid.isBirthday(birth: b, on: referenceNow) {
             return languageManager.text(.kidBirthdayToday)
         }
         return languageManager.text(.kidBirthday)
@@ -1160,7 +960,7 @@ struct AddEditKidView: View {
     }
 
     private var kidProfileSubtitle: String {
-        let freq = AppStringCatalog.displayDepositFrequency(depositFrequency, language: languageManager.language)
+        let freq = AppStringCatalog.displayDepositFrequency(.weekly, language: languageManager.language)
         if let val = Double(weeklyAllowance), val > 0 {
             return String(
                 format: languageManager.text(.allowanceLineFormat),
@@ -1190,7 +990,7 @@ struct AddEditKidView: View {
     @ViewBuilder
     private var kidDetailsHeroSection: some View {
         let avatarSize: CGFloat = 90
-        let cornerRadius = VeckoCreditCardChrome.cornerRadius
+        let cornerRadius = Self.contentCornerRadius
         /// How much the card is pulled up under the avatar (larger = card top closer to sheet top; avatar unchanged).
         let avatarCardOverlap: CGFloat = 60
 
@@ -1332,7 +1132,7 @@ struct AddEditKidView: View {
 
                 Section(languageManager.text(.kidSectionAllowance)) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        RoundedRectangle(cornerRadius: Self.contentCornerRadius, style: .continuous)
                             .fill(Color.appGreen.opacity(colorScheme == .dark ? 0.2 : 0.14))
                         KidAllowanceInputRow(
                             text: $weeklyAllowance,
@@ -1350,8 +1150,8 @@ struct AddEditKidView: View {
 
                 Section(languageManager.text(.kidMonthlyInterestHeader)) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.appGreen.opacity(colorScheme == .dark ? 0.2 : 0.14))
+                        RoundedRectangle(cornerRadius: Self.contentCornerRadius, style: .continuous)
+                            .fill(Color.yellow.opacity(colorScheme == .dark ? 0.2 : 0.18))
                         KidPercentInputRow(percent: $monthlyInterestPercent)
                             .frame(minHeight: 48)
                     }
@@ -1360,98 +1160,53 @@ struct AddEditKidView: View {
                 }
 
                 Section(languageManager.text(.kidSectionSchedule)) {
-                    Picker(languageManager.text(.kidDepositFrequency), selection: $depositFrequency) {
-                        ForEach(DepositFrequency.allCases, id: \.self) { option in
-                            Text(AppStringCatalog.displayDepositFrequency(option, language: languageManager.language)).tag(option)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    if depositFrequency == .weekly {
-                        HStack(spacing: 4) {
-                            ForEach(0..<7, id: \.self) { index in
-                                let weekday = ((index + 1) % 7) + 1
-                                let isSelected = selectedWeekday == weekday
-                                Button {
-                                    selectedWeekday = weekday
-                                } label: {
-                                    VStack(spacing: 4) {
-                                        Text(shortWeekdayLabelsMondayFirst[index])
-                                            .font(.caption.weight(isSelected ? .bold : .medium))
-                                            .minimumScaleFactor(0.65)
-                                            .lineLimit(1)
-                                            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-                                        Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .padding(.horizontal, 2)
-                                    .background(
-                                        Capsule()
-                                            .fill(
-                                                isSelected
-                                                    ? Color.appGreen.opacity(colorScheme == .dark ? 0.2 : 0.14)
-                                                    : Color(UIColor.secondarySystemGroupedBackground)
-                                            )
-                                    )
+                    HStack(spacing: 4) {
+                        ForEach(0..<7, id: \.self) { index in
+                            let weekday = ((index + 1) % 7) + 1
+                            let isSelected = selectedWeekday == weekday
+                            Button {
+                                selectedWeekday = weekday
+                            } label: {
+                                VStack(spacing: 4) {
+                                    Text(shortWeekdayLabelsMondayFirst[index])
+                                        .font(.caption.weight(isSelected ? .bold : .medium))
+                                        .minimumScaleFactor(0.65)
+                                        .lineLimit(1)
+                                        .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                                    Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(isSelected ? Color.gray : Color.gray)
                                 }
-                                .buttonStyle(.plain)
                                 .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 2)
+                                .background(
+                                    RoundedRectangle(cornerRadius: Self.contentCornerRadius, style: .continuous)
+                                        .fill(
+                                            isSelected
+                                                ? Color.yellow.opacity(colorScheme == .dark ? 0.2 : 0.18)
+                                                : Color(UIColor.secondarySystemGroupedBackground)
+                                        )
+                                )
                             }
+                            .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity)
                         }
-                        .padding(.vertical, 6)
                     }
-
-                    if depositFrequency == .monthly {
-                        HStack(spacing: 4) {
-                            ForEach(FamilyKid.allowedMonthlyPayDays, id: \.self) { day in
-                                let isSelected = selectedMonthlyDay == day
-                                Button {
-                                    selectedMonthlyDay = day
-                                } label: {
-                                    VStack(spacing: 4) {
-                                        Text(ordinalDay(day))
-                                            .font(.caption.weight(isSelected ? .bold : .medium))
-                                            .minimumScaleFactor(0.65)
-                                            .lineLimit(1)
-                                            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-                                        Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .padding(.horizontal, 2)
-                                    .background(
-                                        Capsule()
-                                            .fill(
-                                                isSelected
-                                                    ? Color.appGreen.opacity(colorScheme == .dark ? 0.2 : 0.14)
-                                                    : Color(UIColor.secondarySystemGroupedBackground)
-                                            )
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                                .frame(maxWidth: .infinity)
-                            }
-                        }
-                        .padding(.vertical, 6)
-                    }
+                    .padding(.vertical, 6)
 
                     Button {
                         showingDepositTimePicker = true
                     } label: {
                         HStack {
                             Text(languageManager.text(.kidDepositTime))
-                                .foregroundColor(.primary)
+                                .foregroundColor(colorScheme == .dark ? .white : .black)
                             Spacer()
                             Text(depositTimeString)
-                                .foregroundColor(.blue)
+                                .foregroundColor(colorScheme == .dark ? .white : .black)
                             Image(systemName: "chevron.right")
                                 .font(.caption)
-                                .foregroundColor(.blue)
+                                .foregroundColor(colorScheme == .dark ? .white : .black)
                         }
                     }
 
@@ -1509,19 +1264,12 @@ struct AddEditKidView: View {
                 weeklyAllowance = String(format: "%.2f", kid.weeklyAllowance)
                 currentBalance = String(format: "%.2f", kid.currentBalance)
                 selectedIcon = kid.icon
-                depositFrequency = kid.depositFrequency
                 selectedWeekday = kid.depositWeekday
-                selectedMonthlyDay = FamilyKid.normalizedMonthlyPayDay(kid.depositMonthlyDay)
                 depositTime = kid.depositTime
                 monthlyInterestPercent = kid.monthlyInterestPercent
                 if let data = kid.customImageData {
                     selectedImage = UIImage(data: data)
                 }
-            }
-        }
-        .onChange(of: depositFrequency) { _, newValue in
-            if newValue == .monthly {
-                selectedMonthlyDay = FamilyKid.normalizedMonthlyPayDay(selectedMonthlyDay)
             }
         }
     }
@@ -1566,9 +1314,9 @@ struct AddEditKidView: View {
             currentBalance: balanceValue,
             icon: selectedIcon,
             customImageData: selectedImage?.jpegData(compressionQuality: 0.8),
-            depositFrequency: depositFrequency,
+            depositFrequency: .weekly,
             depositWeekday: selectedWeekday,
-            depositMonthlyDay: selectedMonthlyDay,
+            depositMonthlyDay: 1,
             depositTime: depositTime,
             monthlyInterestPercent: monthlyInterestPercent,
             lastInterestAppliedMonthKey: {
@@ -1602,14 +1350,6 @@ struct AddEditKidView: View {
         return formatter.string(from: depositTime)
     }
 
-    private func ordinalDay(_ number: Int) -> String {
-        switch number {
-        case 1, 21, 31: return "\(number)st"
-        case 2, 22: return "\(number)nd"
-        case 3, 23: return "\(number)rd"
-        default: return "\(number)th"
-        }
-    }
 }
 
 private struct KidIconPickerView: View {
@@ -1748,6 +1488,18 @@ struct FamilyKid: Identifiable {
         case "figure.run": return .green
         default: return .blue
         }
+    }
+
+    /// Whether `birthday`'s month and day match `reference` (e.g. today).
+    static func isBirthday(birth: Date, on reference: Date, calendar: Calendar = .autoupdatingCurrent) -> Bool {
+        let ref = calendar.dateComponents([.month, .day], from: reference)
+        let bd = calendar.dateComponents([.month, .day], from: birth)
+        return ref.month == bd.month && ref.day == bd.day
+    }
+
+    func isBirthday(on reference: Date, calendar: Calendar = .autoupdatingCurrent) -> Bool {
+        guard let birthday else { return false }
+        return Self.isBirthday(birth: birthday, on: reference, calendar: calendar)
     }
 
     static let sample: [FamilyKid] = [

@@ -107,6 +107,24 @@ enum AppStringKey {
     case insightsNoActivityYet
     case calendarWeekdayShortFormat
     case insightsInterestByKidTitle
+    case insightsFactsTitle
+    case insightsFactsEmpty
+    case insightsFactsTip
+    case insightsFactBirthdayToday
+    case insightsFactMonthInterest
+    case insightsFactMonthDeposits
+    case insightsFactMonthWithdrawals
+    case insightsFactMonthNetPositive
+    case insightsFactMonthNetNegative
+    case insightsFactWeekDeposits
+    case insightsFactGoalReached
+    case insightsFactGoalReachedThisWeek
+    case insightsFactGoalAlmost
+    case insightsFactGoalAlmostLead
+    case insightsFactGoalAlmostTrail
+    case insightsFactTopBalanceKid
+    case insightsFactFamilyBalance
+    case insightsFactActiveGoals
     case insightsGoalsByKidTitle
     case insightsGoalsCountFormat
     case insightsNoGoalsForKid
@@ -178,7 +196,7 @@ enum AppStringCatalog {
         case .tabInsights: return t(language, en: "Insights", sv: "Insikter", es: "Resumen", fr: "Analyses", de: "Einblicke")
         case .tabGoals: return t(language, en: "Goals", sv: "Mål", es: "Metas", fr: "Objectifs", de: "Ziele")
         case .tabHome: return t(language, en: "Home", sv: "Hem", es: "Inicio", fr: "Accueil", de: "Start")
-        case .tabFamily: return t(language, en: "Family", sv: "Familj", es: "Familia", fr: "Famille", de: "Familie")
+        case .tabFamily: return t(language, en: "History", sv: "Historik", es: "Historial", fr: "Historique", de: "Verlauf")
         case .tabSettings: return t(language, en: "Settings", sv: "Inställningar", es: "Ajustes", fr: "Réglages", de: "Einstellungen")
 
         case .welcomeTitle1: return t(language, en: "Welcome to Vecko", sv: "Välkommen till Vecko", es: "Bienvenido a Vecko", fr: "Bienvenue dans Vecko", de: "Willkommen bei Vecko")
@@ -207,8 +225,8 @@ enum AppStringCatalog {
         case .homeNoKidsTitle: return t(language, en: "No kids yet", sv: "Inga barn ännu", es: "Aún no hay niños", fr: "Pas encore d’enfants", de: "Noch keine Kinder")
         case .homeNoKidsSubtitleFamily: return t(language, en: "Tap + in the Family tab to add your first allowance details.", sv: "Tryck på + under Familj för att lägga till ditt första veckopengs­upplägg.", es: "Toca + en Familia para añadir tu primera paga.", fr: "Appuyez sur + dans Famille pour ajouter la première allocation.", de: "Tippe in „Familie“ auf +, um dein erstes Taschengeld anzulegen.")
 
-        case .familyTitle: return t(language, en: "Family", sv: "Familj", es: "Familia", fr: "Famille", de: "Familie")
-        case .familySubtitle: return t(language, en: "Manage your kids’ allowance details", sv: "Hantera barnens veckopengar", es: "Gestiona los detalles de la paga", fr: "Gérez les allocations de vos enfants", de: "Verwalte die Taschengeld‑Details deiner Kinder")
+        case .familyTitle: return t(language, en: "History", sv: "Historik", es: "Historial", fr: "Historique", de: "Verlauf")
+        case .familySubtitle: return t(language, en: "All changes and transactions for your kids", sv: "Alla ändringar och transaktioner för dina barn", es: "Todos los cambios y transacciones de tus niños", fr: "Tous les changements et transactions pour vos enfants", de: "Alle Änderungen und Transaktionen für deine Kinder")
         case .familyDeposit: return t(language, en: "Deposit", sv: "Sätt in", es: "Ingresar", fr: "Dépôt", de: "Einzahlen")
         case .familyWithdraw: return t(language, en: "Withdraw", sv: "Ta ut", es: "Retirar", fr: "Retrait", de: "Abheben")
         case .familyNoKidsTitle: return t(language, en: "No kids info yet", sv: "Ingen barninfo ännu", es: "Aún no hay información", fr: "Pas encore d’informations", de: "Noch keine Kinderinfos")
@@ -290,7 +308,7 @@ enum AppStringCatalog {
         case .goalsDeleteGoalConfirmMessage: return t(language, en: "This goal will be removed from your list. This cannot be undone.", sv: "Målet tas bort från listan. Detta kan inte ångras.", es: "La meta se eliminará de la lista. No se puede deshacer.", fr: "Cet objectif sera retiré de la liste. Action irréversible.", de: "Das Ziel wird aus der Liste entfernt. Das kann nicht rückgängig gemacht werden.")
 
         case .insightsTitle: return t(language, en: "Insights", sv: "Insikter", es: "Resumen", fr: "Analyses", de: "Einblicke")
-        case .insightsSubtitle: return t(language, en: "Review activity, history, and trends", sv: "Se aktivitet, historik och trender", es: "Revisa actividad, historial y tendencias", fr: "Consultez l’activité, l’historique et les tendances", de: "Aktivität, Verlauf und Trends ansehen")
+        case .insightsSubtitle: return t(language, en: "Review activity and trends", sv: "Se aktivitet och trender", es: "Revisa actividad y tendencias", fr: "Consultez l’activité et les tendances", de: "Aktivität und Trends ansehen")
         case .insightsTabInsights: return t(language, en: "Insights", sv: "Insikter", es: "Resumen", fr: "Analyses", de: "Einblicke")
         case .insightsTabHistory: return t(language, en: "History", sv: "Historik", es: "Historial", fr: "Historique", de: "Verlauf")
         case .historyEmptyTitle: return t(language, en: "No history yet", sv: "Ingen historik ännu", es: "Aún no hay historial", fr: "Pas encore d’historique", de: "Noch kein Verlauf")
@@ -315,6 +333,24 @@ enum AppStringCatalog {
         case .insightsNoActivityYet: return t(language, en: "No activity yet", sv: "Ingen aktivitet ännu", es: "Aún no hay actividad", fr: "Pas encore d’activité", de: "Noch keine Aktivität")
         case .calendarWeekdayShortFormat: return t(language, en: "EEE", sv: "EEE", es: "EEE", fr: "EEE", de: "EEE")
         case .insightsInterestByKidTitle: return t(language, en: "Interest", sv: "Ränta", es: "Intereses", fr: "Intérêts", de: "Zinsen")
+        case .insightsFactsTitle: return t(language, en: "Did you know?", sv: "Visste du?", es: "¿Sabías que…?", fr: "Le saviez-vous ?", de: "Wusstest du?")
+        case .insightsFactsEmpty: return t(language, en: "Add kids to see personalized insights here.", sv: "Lägg till barn för att se insikter här.", es: "Añade niños para ver datos aquí.", fr: "Ajoutez des enfants pour voir des infos ici.", de: "Füge Kinder hinzu, um Einblicke zu sehen.")
+        case .insightsFactsTip: return t(language, en: "Log deposits and set goals to unlock more insights.", sv: "Bokför insättningar och sätt mål för fler insikter.", es: "Registra ingresos y metas para más datos.", fr: "Enregistrez des dépôts et des objectifs pour plus d’infos.", de: "Buche Einzahlungen und Ziele für mehr Einblicke.")
+        case .insightsFactBirthdayToday: return t(language, en: "Today is %@’s birthday! 🎁", sv: "Idag fyller %@ år! 🎁", es: "¡Hoy es el cumpleaños de %@! 🎁", fr: "C’est l’anniversaire de %@ aujourd’hui ! 🎁", de: "Heute hat %@ Geburtstag! 🎁")
+        case .insightsFactMonthInterest: return t(language, en: "This month you paid %@ in interest to your kids.", sv: "Denna månad betalade du %@ i ränta till barnen.", es: "Este mes pagaste %@ de intereses a tus niños.", fr: "Ce mois-ci, vous avez versé %@ d’intérêts à vos enfants.", de: "Diesen Monat hast du %@ Zinsen an deine Kinder gezahlt.")
+        case .insightsFactMonthDeposits: return t(language, en: "This month %@ was deposited for your kids.", sv: "Denna månad sattes %@ in till barnen.", es: "Este mes se ingresaron %@ para tus niños.", fr: "Ce mois-ci, %@ ont été déposés pour vos enfants.", de: "Diesen Monat wurden %@ für deine Kinder eingezahlt.")
+        case .insightsFactMonthWithdrawals: return t(language, en: "This month your kids withdrew %@.", sv: "Denna månad tog barnen ut %@.", es: "Este mes tus niños retiraron %@.", fr: "Ce mois-ci, vos enfants ont retiré %@.", de: "Diesen Monat haben deine Kinder %@ abgehoben.")
+        case .insightsFactMonthNetPositive: return t(language, en: "This month your kids saved %@ net.", sv: "Denna månad sparade barnen %@ netto.", es: "Este mes tus niños ahorraron %@ netos.", fr: "Ce mois-ci, vos enfants ont épargné %@ nets.", de: "Diesen Monat haben deine Kinder netto %@ gespart.")
+        case .insightsFactMonthNetNegative: return t(language, en: "This month net spending was %@.", sv: "Denna månad var nettouttag %@.", es: "Este mes el gasto neto fue %@.", fr: "Ce mois-ci, les dépenses nettes ont été de %@.", de: "Diesen Monat betrug die Nettoausgabe %@.")
+        case .insightsFactWeekDeposits: return t(language, en: "This week %@ was deposited for your kids.", sv: "Denna vecka sattes %@ in till barnen.", es: "Esta semana se ingresaron %@ para tus niños.", fr: "Cette semaine, %@ ont été déposés pour vos enfants.", de: "Diese Woche wurden %@ für deine Kinder eingezahlt.")
+        case .insightsFactGoalReached: return t(language, en: "%@ reached the goal", sv: "%@ nådde målet", es: "%@ alcanzó la meta", fr: "%@ a atteint l’objectif", de: "%@ hat das Ziel erreicht")
+        case .insightsFactGoalReachedThisWeek: return t(language, en: "This week %@ reached the goal", sv: "Denna vecka nådde %@ målet", es: "Esta semana %@ alcanzó la meta", fr: "Cette semaine, %@ a atteint l’objectif", de: "Diese Woche hat %@ das Ziel erreicht")
+        case .insightsFactGoalAlmost: return t(language, en: "%@ is only %@ away from «%@».", sv: "%@ saknar bara %@ till «%@».", es: "A %@ le faltan solo %@ para «%@».", fr: "Il ne manque que %@ à %@ pour « %@ ».", de: "%@ fehlen nur noch %@ bis «%@».")
+        case .insightsFactGoalAlmostLead: return t(language, en: "%@ is only ", sv: "%@ saknar bara ", es: "A %@ le faltan solo ", fr: "Il ne manque que ", de: "%@ fehlen nur noch ")
+        case .insightsFactGoalAlmostTrail: return t(language, en: " away from «%@».", sv: " till «%@».", es: " para «%@».", fr: " pour « %@ ».", de: " bis «%@».")
+        case .insightsFactTopBalanceKid: return t(language, en: "%@ has the highest balance at %@.", sv: "%@ har högst saldo med %@.", es: "%@ tiene el saldo más alto: %@.", fr: "%@ a le plus gros solde : %@.", de: "%@ hat mit %@ das höchste Guthaben.")
+        case .insightsFactFamilyBalance: return t(language, en: "Your kids hold %@ in total.", sv: "Barnen har totalt %@.", es: "Tus niños tienen %@ en total.", fr: "Vos enfants détiennent %@ au total.", de: "Deine Kinder haben insgesamt %@.")
+        case .insightsFactActiveGoals: return t(language, en: "Your family is working toward %d savings goals.", sv: "Familjen jobbar mot %d sparmål.", es: "Tu familia trabaja en %d metas de ahorro.", fr: "Votre famille poursuit %d objectifs d’épargne.", de: "Eure Familie verfolgt %d Sparziele.")
         case .insightsGoalsByKidTitle: return t(language, en: "Goals", sv: "Mål", es: "Metas", fr: "Objectifs", de: "Ziele")
         case .insightsGoalsCountFormat: return t(language, en: "%d goals", sv: "%d mål", es: "%d metas", fr: "%d objectifs", de: "%d Ziele")
         case .insightsNoGoalsForKid: return t(language, en: "No goals", sv: "Inga mål", es: "Sin metas", fr: "Pas d’objectif", de: "Keine Ziele")

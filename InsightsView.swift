@@ -5,19 +5,8 @@
 //  Created by EVYATAR DAYAN on 2026-04-25.
 //
 
+import Combine
 import SwiftUI
-
-private enum InsightsMainTab: String, CaseIterable {
-    case insights
-    case history
-
-    func title(using language: LanguageManager) -> String {
-        switch self {
-        case .insights: return language.text(.insightsTabInsights)
-        case .history: return language.text(.insightsTabHistory)
-        }
-    }
-}
 
 private enum ActivityCategory {
     case interest
@@ -34,46 +23,21 @@ private enum ActivityCategory {
 }
 
 struct InsightsView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("isDarkMode") private var isDarkMode: Bool = false
     @EnvironmentObject var currencyManager: CurrencyManager
     @EnvironmentObject var languageManager: LanguageManager
     @EnvironmentObject var familyStore: FamilyStore
     @EnvironmentObject var activityStore: ActivityStore
-    @EnvironmentObject var historyStore: HistoryStore
     @EnvironmentObject var goalsStore: GoalsStore
 
-    @State private var mainTab: InsightsMainTab = .insights
     @State private var currentDate = Date()
     @State private var selectedDate: Date?
     @State private var slideDirection: SlideDirection = .none
-    @State private var selectedHistoryKidID: UUID?
-    private var historyKidFilters: [HistoryKidFilter] {
-        var seen: Set<UUID> = []
-        var items: [HistoryKidFilter] = []
+    @State private var selectedFactIndex = 0
+    @State private var factCarouselAdvancingForward = true
 
-        // Always include current kids, even if older history rows lack kid metadata.
-        for kid in familyStore.kids {
-            guard !seen.contains(kid.id) else { continue }
-            seen.insert(kid.id)
-            items.append(HistoryKidFilter(id: kid.id, name: kid.name))
-        }
-
-        // Also include kids that might be removed from family but still exist in history.
-        for entry in historyStore.entries {
-            guard let kidId = entry.kidId, let kidName = entry.kidName else { continue }
-            guard !seen.contains(kidId) else { continue }
-            seen.insert(kidId)
-            items.append(HistoryKidFilter(id: kidId, name: kidName))
-        }
-
-        return items.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-    }
-
-    private var filteredHistoryEntries: [FamilyHistoryEntry] {
-        guard let selectedHistoryKidID else { return historyStore.entries }
-        return historyStore.entries.filter { $0.kidId == selectedHistoryKidID }
-    }
-
+    private let factCarouselTimer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
 
     private var events: [AllowanceEvent] {
         activityStore.transactions(forKids: familyStore.kids).map { transaction in
@@ -181,39 +145,208 @@ struct InsightsView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 pageHeader
-                Picker("", selection: $mainTab) {
-                    ForEach(InsightsMainTab.allCases, id: \.self) { tab in
-                        Text(tab.title(using: languageManager)).tag(tab)
+                ScrollView {
+                    VStack(spacing: 20) {
+                        insightsFactsCard
+                        breakdownCard
+                        interestByKidCard
+                        goalsByKidCard
+                        calendarCard
                     }
+                    .padding()
+                    .padding(.bottom, 70)
                 }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.top, 8)
-                .padding(.bottom, 8)
                 .background(Color(.systemGroupedBackground))
-
-                if mainTab == .insights {
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            breakdownCard
-                            interestByKidCard
-                            goalsByKidCard
-                            calendarCard
-                        }
-                        .padding()
-                        .padding(.bottom, 70)
-                    }
-                    .background(Color(.systemGroupedBackground))
-                } else {
-                    historyTabContent
-                }
             }
             .background(Color(.systemGroupedBackground))
-                        .navigationTitle("")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
 
+
+    private var insightFacts: [InsightFact] {
+        InsightsFactsBuilder.build(
+            InsightsFactsBuilder.Context(
+                kids: familyStore.kids,
+                goals: goalsStore.goals,
+                events: events.map { event in
+                    InsightsFactsBuilder.InsightsFactEvent(
+                        kidId: event.kidId,
+                        kidName: event.kidName,
+                        amount: event.amount,
+                        date: event.date,
+                        isInterest: event.category == .interest,
+                        isDeposit: event.category == .deposit
+                    )
+                },
+                language: languageManager.language,
+                locale: languageManager.locale,
+                calendar: calendar,
+                referenceDate: Date(),
+                formatAmount: { currencyManager.formatAmount($0) }
+            )
+        )
+    }
+
+    private var insightsFactsCard: some View {
+        Group {
+            if insightFacts.isEmpty {
+                Text(languageManager.text(.insightsFactsEmpty))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ZStack {
+                    TabView(selection: $selectedFactIndex) {
+                        ForEach(Array(insightFacts.enumerated()), id: \.element.id) { index, fact in
+                            insightFactSlide(fact)
+                                .tag(index)
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .frame(height: 68)
+
+                    if insightFacts.count > 1 {
+                        HStack {
+                            factCarouselButton(
+                                systemName: "chevron.left",
+                                enabled: selectedFactIndex > 0
+                            ) {
+                                factCarouselAdvancingForward = false
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    selectedFactIndex = max(0, selectedFactIndex - 1)
+                                }
+                            }
+
+                            Spacer()
+
+                            factCarouselButton(
+                                systemName: "chevron.right",
+                                enabled: selectedFactIndex < insightFacts.count - 1
+                            ) {
+                                factCarouselAdvancingForward = true
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    selectedFactIndex = min(insightFacts.count - 1, selectedFactIndex + 1)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 2)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(isDarkMode ? Color(.systemGray6) : Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .onChange(of: insightFacts.count) { _, count in
+            if selectedFactIndex >= count {
+                selectedFactIndex = max(0, count - 1)
+            }
+            factCarouselAdvancingForward = true
+        }
+        .onChange(of: selectedFactIndex) { oldIndex, newIndex in
+            if newIndex > oldIndex {
+                factCarouselAdvancingForward = true
+            } else if newIndex < oldIndex {
+                factCarouselAdvancingForward = false
+            }
+        }
+        .onReceive(factCarouselTimer) { _ in
+            guard scenePhase == .active else { return }
+            advanceFactCarouselAutomatically()
+        }
+    }
+
+    private func advanceFactCarouselAutomatically() {
+        let count = insightFacts.count
+        guard count > 1 else { return }
+
+        withAnimation(.easeInOut(duration: 0.35)) {
+            if factCarouselAdvancingForward {
+                if selectedFactIndex >= count - 1 {
+                    factCarouselAdvancingForward = false
+                    selectedFactIndex = count - 2
+                } else {
+                    selectedFactIndex += 1
+                }
+            } else {
+                if selectedFactIndex <= 0 {
+                    factCarouselAdvancingForward = true
+                    selectedFactIndex = 1
+                } else {
+                    selectedFactIndex -= 1
+                }
+            }
+        }
+    }
+
+    private func insightFactSlide(_ fact: InsightFact) -> some View {
+        Group {
+            if let goalTitle = fact.highlightedGoalTitle {
+                VStack(spacing: 6) {
+                    factStyledText(fact.parts)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.9)
+
+                    HStack(spacing: 6) {
+                        Text("🎯")
+                            .font(.subheadline)
+                        Text(goalTitle)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.appGreen)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                        Text("🎯")
+                            .font(.subheadline)
+                    }
+                }
+            } else {
+                factStyledText(fact.parts)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.9)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .padding(.horizontal, 32)
+    }
+
+    private func factStyledText(_ parts: [InsightFactPart]) -> Text {
+        parts.reduce(Text("")) { combined, part in
+            switch part {
+            case .plain(let string):
+                return combined + Text(string)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+            case .amount(let string):
+                return combined + Text(string)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.appGreen)
+            }
+        }
+    }
+
+    private func factCarouselButton(
+        systemName: String,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(enabled ? Color.appGreen : Color.secondary.opacity(0.35))
+                .frame(width: 28, height: 28)
+                .background(Color(.systemBackground).opacity(0.9))
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+    }
 
     private var pageHeader: some View {
         VStack(alignment: .center, spacing: 4) {
@@ -230,101 +363,6 @@ struct InsightsView: View {
         .padding(.top, 15)
         .padding(.bottom, 8)
         .background(Color(.systemGroupedBackground))
-    }
-
-    private var historyTabContent: some View {
-        Group {
-            if historyStore.entries.isEmpty {
-                VStack(spacing: 12) {
-                    Spacer()
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 44))
-                        .foregroundStyle(.secondary)
-                    Text(languageManager.text(.historyEmptyTitle))
-                        .font(.headline)
-                    Text(languageManager.text(.historyEmptySubtitle))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(.systemGroupedBackground))
-            } else {
-                VStack(spacing: 8) {
-                    historyKidFilterBar
-
-                    if filteredHistoryEntries.isEmpty {
-                        VStack(spacing: 10) {
-                            Spacer()
-                            Image(systemName: "line.3.horizontal.decrease.circle")
-                                .font(.system(size: 40))
-                                .foregroundStyle(.secondary)
-                            Text(languageManager.text(.historyFilteredEmptyTitle))
-                                .font(.headline)
-                            Text(languageManager.text(.historyFilteredEmptySubtitle))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                ForEach(filteredHistoryEntries) { entry in
-                                    FamilyHistoryRowView(
-                                        entry: entry,
-                                        kid: familyStore.kids.first(where: { $0.id == entry.kidId }),
-                                        isDarkMode: isDarkMode
-                                    )
-                                    .environmentObject(languageManager)
-                                }
-                            }
-                            .padding()
-                            .padding(.bottom, 70)
-                        }
-                    }
-                }
-                .background(Color(.systemGroupedBackground))
-            }
-        }
-    }
-
-    private var historyKidFilterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                Button {
-                    selectedHistoryKidID = nil
-                } label: {
-                    Text(languageManager.text(.insightsAll))
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(selectedHistoryKidID == nil ? Color.blue.opacity(0.18) : Color(.secondarySystemBackground))
-                        .foregroundStyle(selectedHistoryKidID == nil ? Color.blue : Color.primary)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-
-                ForEach(historyKidFilters) { item in
-                    Button {
-                        selectedHistoryKidID = item.id
-                    } label: {
-                        Text(item.name)
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(selectedHistoryKidID == item.id ? Color.blue.opacity(0.18) : Color(.secondarySystemBackground))
-                            .foregroundStyle(selectedHistoryKidID == item.id ? Color.blue : Color.primary)
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal)
-            .padding(.top, 8)
-        }
     }
 
     private var interestByKidCard: some View {
@@ -863,37 +901,37 @@ private struct PieSliceData {
 private struct DonutChartView: View {
     let slices: [PieSliceData]
     let lineWidth: CGFloat
-    @State private var isVisible: Bool = false
+
+    private static let appearDuration: TimeInterval = 0.4
+
+    @State private var drawProgress: CGFloat = 0
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 ForEach(Array(normalizedSlices.enumerated()), id: \.offset) { index, slice in
                     let gap = min(0.012, (slice.end - slice.start) * 0.35)
+                    let sliceStart = slice.start + (gap / 2)
+                    let sliceEnd = slice.end - (gap / 2)
+                    let animatedEnd = sliceStart + (sliceEnd - sliceStart) * drawProgress
                     Circle()
-                        .trim(
-                            from: slice.start + (gap / 2),
-                            to: slice.end - (gap / 2)
-                        )
+                        .trim(from: sliceStart, to: animatedEnd)
                         .stroke(slice.color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
                         .rotationEffect(.degrees(-90))
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
-            .scaleEffect(isVisible ? 1 : 0.92)
-            .opacity(isVisible ? 1 : 0)
-            .onAppear {
-                isVisible = false
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                    isVisible = true
-                }
-            }
-            .onChange(of: slices.count) { _, _ in
-                isVisible = false
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                    isVisible = true
-                }
-            }
+            .scaleEffect(0.94 + (0.06 * drawProgress))
+            .opacity(Double(drawProgress))
+            .onAppear { playAppearAnimation() }
+            .onChange(of: slices.count) { _, _ in playAppearAnimation() }
+        }
+    }
+
+    private func playAppearAnimation() {
+        drawProgress = 0
+        withAnimation(.easeOut(duration: Self.appearDuration)) {
+            drawProgress = 1
         }
     }
 
@@ -959,108 +997,10 @@ private struct AllowanceEvent: Identifiable {
     let isProjected: Bool
 }
 
-private struct HistoryKidFilter: Identifiable {
-    let id: UUID
-    let name: String
-}
-
 private enum SlideDirection {
     case left
     case right
     case none
-}
-
-private struct FamilyHistoryRowView: View {
-    @EnvironmentObject var languageManager: LanguageManager
-    let entry: FamilyHistoryEntry
-    let kid: FamilyKid?
-    let isDarkMode: Bool
-
-    private var fallbackInitial: String {
-        let source = (entry.kidName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
-            ? entry.kidName!
-            : entry.detail
-        return String(source.prefix(1)).uppercased()
-    }
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            avatarView
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(AppStringCatalog.localizedHistoryTitle(storedTitle: entry.title, language: languageManager.language))
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-
-                Text(entry.detail)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(formattedDate(entry.date))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text(formattedTime(entry.date))
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
-            }
-        }
-        .padding()
-        .background(isDarkMode ? Color(.systemGray6) : Color.white)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 1)
-    }
-
-    @ViewBuilder
-    private var avatarView: some View {
-        if let data = kid?.customImageData, let image = UIImage(data: data) {
-            Image(uiImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: 50, height: 50)
-                .clipShape(Circle())
-        } else if let kid {
-            KidStoredIconView(
-                iconName: kid.icon,
-                customImageData: kid.customImageData,
-                size: 50,
-                symbolAccentColor: kid.iconColor
-            )
-        } else {
-            ZStack {
-                Circle()
-                    .fill(Color.gray.opacity(0.15))
-                    .frame(width: 50, height: 50)
-                Text(fallbackInitial)
-                    .font(.headline)
-                    .foregroundColor(.gray)
-            }
-        }
-    }
-
-    private func formattedDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = languageManager.locale
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
-    }
-
-    private func formattedTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = languageManager.locale
-        formatter.dateStyle = .none
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
-    }
 }
 
 #Preview {
@@ -1069,6 +1009,5 @@ private struct FamilyHistoryRowView: View {
         .environmentObject(CurrencyManager())
         .environmentObject(FamilyStore())
         .environmentObject(ActivityStore())
-        .environmentObject(HistoryStore())
         .environmentObject(GoalsStore())
 }

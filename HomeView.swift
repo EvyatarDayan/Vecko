@@ -362,19 +362,22 @@ struct HomeView: View {
                 .background(Color(.systemGroupedBackground))
 
             ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(kids) { kid in
-                        KidAllowanceRowView(
-                            kid: kid,
-                            isSelected: selectedKidID == kid.id
-                        )
-                        .onTapGesture {
-                            persistSelectedKidID(kid.id)
+                TimelineView(.periodic(from: Date(), by: 60)) { context in
+                    LazyVStack(spacing: 12) {
+                        ForEach(kids) { kid in
+                            KidAllowanceRowView(
+                                kid: kid,
+                                isSelected: selectedKidID == kid.id,
+                                referenceNow: context.date
+                            )
+                            .onTapGesture {
+                                persistSelectedKidID(kid.id)
+                            }
                         }
                     }
+                    .padding(.horizontal)
+                    .padding(.bottom, 70)
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 70)
             }
         }
     }
@@ -443,6 +446,7 @@ private struct KidAllowance: Identifiable {
     let icon: String
     let cardLast4: String
     let customImageData: Data?
+    let birthday: Date?
 
     init(from kid: FamilyKid) {
         self.id = kid.id
@@ -453,6 +457,7 @@ private struct KidAllowance: Identifiable {
         self.icon = kid.icon
         self.cardLast4 = KidAllowance.last4Digits(from: kid.id)
         self.customImageData = kid.customImageData
+        self.birthday = kid.birthday
     }
 
     private static func last4Digits(from id: UUID) -> String {
@@ -470,6 +475,12 @@ private struct KidAllowanceRowView: View {
     @EnvironmentObject var languageManager: LanguageManager
     let kid: KidAllowance
     let isSelected: Bool
+    var referenceNow: Date = Date()
+
+    private var isBirthdayToday: Bool {
+        guard let birthday = kid.birthday else { return false }
+        return FamilyKid.isBirthday(birth: birthday, on: referenceNow)
+    }
 
     var body: some View {
         HStack(spacing: 16) {
@@ -481,11 +492,19 @@ private struct KidAllowanceRowView: View {
             )
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(kid.name)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                HStack(spacing: 4) {
+                    Text(kid.name)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    if isBirthdayToday {
+                        Text("🎁")
+                            .font(.headline)
+                            .accessibilityLabel(languageManager.text(.kidBirthdayToday))
+                    }
+                }
 
                 Text(
                     String(

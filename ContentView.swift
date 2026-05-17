@@ -37,11 +37,11 @@ struct ContentView: View {
                         case 0:
                             InsightsView()
                         case 1:
-                            GoalsView()
+                            FamilyView()
                         case 2:
                             HomeView()
                         case 3:
-                            FamilyView()
+                            GoalsView()
                         case 4:
                             SettingsView()
                         default:
@@ -77,8 +77,8 @@ struct ContentView: View {
                             )
 
                             TabBarButton(
-                                icon: "target",
-                                label: languageManager.text(.tabGoals),
+                                icon: "clock.arrow.circlepath",
+                                label: languageManager.text(.tabFamily),
                                 isSelected: selectedTab == 1,
                                 action: { selectedTab = 1 }
                             )
@@ -91,8 +91,8 @@ struct ContentView: View {
                             )
 
                             TabBarButton(
-                                icon: "person.3.fill",
-                                label: languageManager.text(.tabFamily),
+                                icon: "target",
+                                label: languageManager.text(.tabGoals),
                                 isSelected: selectedTab == 3,
                                 action: { selectedTab = 3 }
                             )
@@ -112,7 +112,7 @@ struct ContentView: View {
         }
         .onAppear {
             if !didSetInitialTab {
-                selectedTab = familyStore.kids.isEmpty ? 3 : 2
+                selectedTab = familyStore.kids.isEmpty ? 1 : 2
                 didSetInitialTab = true
             }
             if !didEvaluateWelcome {
