@@ -51,6 +51,33 @@ extension Button {
     func veckoToolbarActionStyle() -> some View {
         buttonStyle(.borderless)
     }
+
+    /// Gray capsule action label (default red; pass `.appGreen` for confirm-style actions).
+    func veckoPillActionStyle(foreground: Color = .appRed) -> some View {
+        buttonStyle(VeckoPillActionButtonStyle(foreground: foreground))
+    }
+}
+
+struct VeckoPillActionButtonStyle: ButtonStyle {
+    var foreground: Color = .appRed
+    @Environment(\.colorScheme) private var colorScheme
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.semibold))
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 40)
+            .padding(.vertical, 14)
+            .background(
+                Capsule()
+                    .fill(
+                        colorScheme == .dark
+                            ? Color(UIColor.systemGray3)
+                            : Color(UIColor.systemGray4)
+                    )
+            )
+            .opacity(configuration.isPressed ? 0.82 : 1)
+    }
 }
 
 /// Sheet header with plain text actions — avoids iOS 26 toolbar glass circles and label truncation.

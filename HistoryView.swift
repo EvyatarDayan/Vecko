@@ -14,6 +14,7 @@ struct HistoryView: View {
     @EnvironmentObject var historyStore: HistoryStore
 
     @State private var selectedHistoryKidID: UUID?
+    @State private var selectedHistoryEntry: FamilyHistoryEntry?
 
     private var historyKidFilters: [HistoryKidFilter] {
         var seen: Set<UUID> = []
@@ -49,6 +50,13 @@ struct HistoryView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(item: $selectedHistoryEntry) { entry in
+                HistoryEntryDetailSheet(
+                    entry: entry,
+                    kid: familyStore.kids.first(where: { $0.id == entry.kidId })
+                )
+                .environmentObject(languageManager)
+            }
         }
     }
 
@@ -58,7 +66,7 @@ struct HistoryView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity, alignment: .center)
-            Text(languageManager.text(.familySubtitle))
+            Text(languageManager.text(.historySubtitle))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -110,11 +118,16 @@ struct HistoryView: View {
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(filteredHistoryEntries) { entry in
-                                FamilyHistoryRowView(
-                                    entry: entry,
-                                    kid: familyStore.kids.first(where: { $0.id == entry.kidId }),
-                                    isDarkMode: isDarkMode
-                                )
+                                Button {
+                                    selectedHistoryEntry = entry
+                                } label: {
+                                    FamilyHistoryRowView(
+                                        entry: entry,
+                                        kid: familyStore.kids.first(where: { $0.id == entry.kidId }),
+                                        isDarkMode: isDarkMode
+                                    )
+                                }
+                                .buttonStyle(.plain)
                                 .environmentObject(languageManager)
                             }
                         }
@@ -135,6 +148,10 @@ struct HistoryView: View {
         }
     }
 
+    private func kid(for filterID: UUID) -> FamilyKid? {
+        familyStore.kids.first(where: { $0.id == filterID })
+    }
+
     private var historyKidFilterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
@@ -146,7 +163,7 @@ struct HistoryView: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(selectedHistoryKidID == nil ? Color.blue.opacity(0.18) : historyFilterChipIdleBackground)
-                        .foregroundStyle(selectedHistoryKidID == nil ? Color.blue : Color.primary)
+                        .foregroundStyle(.primary)
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -155,13 +172,23 @@ struct HistoryView: View {
                     Button {
                         selectedHistoryKidID = item.id
                     } label: {
-                        Text(item.name)
-                            .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(selectedHistoryKidID == item.id ? Color.blue.opacity(0.18) : historyFilterChipIdleBackground)
-                            .foregroundStyle(selectedHistoryKidID == item.id ? Color.blue : Color.primary)
-                            .clipShape(Capsule())
+                        HStack(spacing: 5) {
+                            if let kid = kid(for: item.id) {
+                                KidStoredIconView(
+                                    iconName: kid.icon,
+                                    customImageData: kid.customImageData,
+                                    size: 18,
+                                    symbolAccentColor: kid.iconColor
+                                )
+                            }
+                            Text(item.name)
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(selectedHistoryKidID == item.id ? Color.blue.opacity(0.18) : historyFilterChipIdleBackground)
+                        .foregroundStyle(.primary)
+                        .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -176,6 +203,79 @@ struct HistoryView: View {
 private struct HistoryKidFilter: Identifiable {
     let id: UUID
     let name: String
+}
+
+private struct HistoryEntryDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var languageManager: LanguageManager
+    let entry: FamilyHistoryEntry
+    let kid: FamilyKid?
+
+    private var localizedTitle: String {
+        AppStringCatalog.localizedHistoryTitle(storedTitle: entry.title, language: languageManager.language)
+    }
+
+    private var formattedDateTime: String {
+        let formatter = DateFormatter()
+        formatter.locale = languageManager.locale
+        formatter.dateStyle = .long
+        formatter.timeStyle = .short
+        return formatter.string(from: entry.date)
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            ScrollView {
+                VStack(spacing: 14) {
+                    Text(localizedTitle)
+                        .font(.title3.weight(.semibold))
+                        .multilineTextAlignment(.center)
+
+                    if let kidName = entry.kidName, !kidName.isEmpty {
+                        HStack(spacing: 12) {
+                            if let kid {
+                                KidStoredIconView(
+                                    iconName: kid.icon,
+                                    customImageData: kid.customImageData,
+                                    size: 48,
+                                    symbolAccentColor: kid.iconColor
+                                )
+                            }
+                            Text(kidName)
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(.primary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    }
+
+                    Text(entry.displayDetail)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(formattedDateTime)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+
+            Button {
+                dismiss()
+            } label: {
+                Text(languageManager.text(.historyGotIt))
+            }
+            .veckoPillActionStyle(foreground: .black)
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 43)
+        .padding(.bottom, 10)
+        .presentationDetents([.height(300)])
+        .presentationDragIndicator(.visible)
+    }
 }
 
 private struct FamilyHistoryRowView: View {
@@ -202,7 +302,7 @@ private struct FamilyHistoryRowView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
 
-                Text(entry.detail)
+                Text(entry.displayDetail)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .lineLimit(1)

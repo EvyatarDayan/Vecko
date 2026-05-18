@@ -135,13 +135,10 @@ struct HomeView: View {
         }
         .onAppear {
             syncSelectionIfNeeded()
-            triggerCardEntranceAnimation()
+            cardFlipAngle = 0
         }
         .onChange(of: familyStore.kids.map(\.id)) { _, _ in
             syncSelectionIfNeeded()
-        }
-        .onChange(of: selectedKidIDRaw) { _, _ in
-            triggerCardEntranceAnimation()
         }
     }
 
@@ -158,8 +155,8 @@ struct HomeView: View {
     }
 
     private func triggerCardEntranceAnimation() {
-        cardFlipAngle = -90
-        withAnimation(.easeInOut(duration: 0.45)) {
+        cardFlipAngle = -120
+        withAnimation(.easeInOut(duration: 0.35)) {
             cardFlipAngle = 0
         }
     }
@@ -318,6 +315,7 @@ struct HomeView: View {
             perspective: 0.7
         )
         .opacity(abs(cardFlipAngle) > 80 ? 0 : 1)
+        .scaleEffect(0.8)
     }
 
     @ViewBuilder
@@ -371,7 +369,9 @@ struct HomeView: View {
                                 referenceNow: context.date
                             )
                             .onTapGesture {
+                                guard selectedKidID != kid.id else { return }
                                 persistSelectedKidID(kid.id)
+                                triggerCardEntranceAnimation()
                             }
                         }
                     }
@@ -387,30 +387,55 @@ struct HomeView: View {
             Button {
                 activeTransactionType = .deposit
             } label: {
-                Text(languageManager.text(.familyDeposit))
-                    .font(.headline)
-                    .foregroundColor(kids.isEmpty ? .secondary : .appGreen)
-                    .frame(maxWidth: .infinity)
+                HStack(spacing: 6) {
+                    Text("⬇️")
+                        .font(.system(size: 13))
+                    Text(languageManager.text(.familyDeposit))
+                        .font(.headline)
+                }
+                .foregroundColor(kids.isEmpty ? .secondary : .appGreen)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color(UIColor.systemGray5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.primary.opacity(0.22), lineWidth: 1)
+                )
             }
-            .buttonStyle(.bordered)
-            .tint(.appGreen)
+            .buttonStyle(.plain)
             .disabled(kids.isEmpty)
 
             Button {
                 activeTransactionType = .withdraw
             } label: {
-                Text(languageManager.text(.familyWithdraw))
-                    .font(.headline)
-                    .foregroundColor(kids.isEmpty ? .secondary : .red)
-                    .frame(maxWidth: .infinity)
+                HStack(spacing: 6) {
+                    Text("⬆️")
+                        .font(.system(size: 13))
+                    Text(languageManager.text(.familyWithdraw))
+                        .font(.headline)
+                }
+                .foregroundColor(kids.isEmpty ? .secondary : .orange)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color(UIColor.systemGray5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.primary.opacity(0.22), lineWidth: 1)
+                )
             }
-            .buttonStyle(.bordered)
-            .tint(.red)
+            .buttonStyle(.plain)
             .disabled(kids.isEmpty)
         }
         .padding(.horizontal)
-        .padding(.top, 15)
-        .padding(.bottom, 23)
+        .padding(.top, 1)
+        .padding(.bottom, 35)
+        .scaleEffect(0.9)
     }
 
     private var emptyStateView: some View {
@@ -494,26 +519,27 @@ private struct KidAllowanceRowView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
                     Text(kid.name)
-                        .font(.headline)
+                        .font(.title3.weight(.semibold))
                         .foregroundColor(.primary)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
                     if isBirthdayToday {
                         Text("🎁")
-                            .font(.headline)
+                            .font(.title3)
                             .accessibilityLabel(languageManager.text(.kidBirthdayToday))
                     }
                 }
 
                 Text(
                     String(
-                        format: languageManager.text(.allowanceLineFormat),
+                        format: languageManager.text(
+                            kid.depositFrequency == .monthly
+                                ? .homeKidAllowancePerMonthLineFormat
+                                : .homeKidAllowancePerWeekLineFormat
+                        ),
                         locale: languageManager.locale,
-                        arguments: [
-                            AppStringCatalog.displayDepositFrequency(kid.depositFrequency, language: languageManager.language),
-                            currencyManager.formatAmount(kid.weeklyAllowance)
-                        ]
+                        arguments: [currencyManager.formatAmount(kid.weeklyAllowance)]
                     )
                 )
                     .font(.footnote)

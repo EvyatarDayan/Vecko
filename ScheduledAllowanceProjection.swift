@@ -35,6 +35,29 @@ enum ScheduledAllowanceProjection {
         return results.sorted { lhs, rhs in lhs.scheduledAt < rhs.scheduledAt }
     }
 
+    /// First scheduled allowance date on or after `now` when cumulative deposits reach `remaining`.
+    static func completionDate(
+        for kid: FamilyKid,
+        remaining: Double,
+        from now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Date? {
+        guard remaining > 0.001, kid.weeklyAllowance > 0 else { return nil }
+
+        var left = remaining
+        let paymentCount = Int(ceil(remaining / kid.weeklyAllowance))
+        let horizonDays = min(365 * 10, max(120, paymentCount * 14 + 30))
+        let payments = projectedPayments(kids: [kid], from: now, horizonDays: horizonDays, calendar: calendar)
+
+        for entry in payments {
+            left -= kid.weeklyAllowance
+            if left <= 0.001 {
+                return entry.scheduledAt
+            }
+        }
+        return nil
+    }
+
     static func stableEventID(kidId: UUID, scheduledAt: Date, calendar: Calendar) -> UUID {
         let dayStart = calendar.startOfDay(for: scheduledAt)
         var hasher = Hasher()

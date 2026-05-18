@@ -70,6 +70,114 @@ final class GoalsStore: ObservableObject {
     }
 }
 
+// MARK: - Goal image presentation (shared background, crop, shadow, PNG)
+
+private enum GoalThumbnailMetrics {
+    static let aspectRatio: CGFloat = 1
+    static let cornerRadius: CGFloat = 12
+    static let listSize: CGFloat = 84
+    static let shadowOpacity: Double = 0.12
+    static let shadowRadius: CGFloat = 6
+    static let shadowY: CGFloat = 3
+}
+
+private enum GoalImageEncoding {
+    static func hasTransparency(_ image: UIImage) -> Bool {
+        guard let alpha = image.cgImage?.alphaInfo else { return false }
+        switch alpha {
+        case .first, .last, .premultipliedFirst, .premultipliedLast, .alphaOnly:
+            return true
+        default:
+            return false
+        }
+    }
+
+    static func data(from image: UIImage?) -> Data? {
+        guard let image else { return nil }
+        if hasTransparency(image), let png = image.pngData() {
+            return png
+        }
+        return image.jpegData(compressionQuality: 0.85)
+    }
+}
+
+private struct GoalThumbnailView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let imageData: Data?
+    let previewImage: UIImage?
+    let iconSystemName: String?
+    var size: CGFloat = GoalThumbnailMetrics.listSize
+    var cornerRadius: CGFloat = GoalThumbnailMetrics.cornerRadius
+
+    init(
+        imageData: Data? = nil,
+        previewImage: UIImage? = nil,
+        iconSystemName: String? = nil,
+        size: CGFloat = GoalThumbnailMetrics.listSize,
+        cornerRadius: CGFloat = GoalThumbnailMetrics.cornerRadius
+    ) {
+        self.imageData = imageData
+        self.previewImage = previewImage
+        self.iconSystemName = iconSystemName
+        self.size = size
+        self.cornerRadius = cornerRadius
+    }
+
+    private var resolvedUIImage: UIImage? {
+        if let previewImage { return previewImage }
+        if let imageData { return UIImage(data: imageData) }
+        return nil
+    }
+
+    private var thumbnailBackgroundColor: Color {
+        colorScheme == .dark
+            ? Color(UIColor.systemGray4)
+            : Color(UIColor.systemGray5)
+    }
+
+    /// Inset for photo/PNG inside the fixed outer frame (frame size unchanged).
+    private var imageContentPadding: CGFloat {
+        size * 0.16
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(thumbnailBackgroundColor)
+
+            thumbnailContent
+        }
+        .aspectRatio(GoalThumbnailMetrics.aspectRatio, contentMode: .fit)
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .shadow(
+            color: .black.opacity(GoalThumbnailMetrics.shadowOpacity),
+            radius: GoalThumbnailMetrics.shadowRadius,
+            x: 0,
+            y: GoalThumbnailMetrics.shadowY
+        )
+    }
+
+    @ViewBuilder
+    private var thumbnailContent: some View {
+        if let uiImage = resolvedUIImage {
+            Image(uiImage: uiImage)
+                .resizable()
+                .scaledToFit()
+                .padding(imageContentPadding)
+        } else if let iconSystemName {
+            Image(systemName: iconSystemName)
+                .font(.system(size: size * 0.28, weight: .medium))
+                .foregroundStyle(Color.blue.opacity(colorScheme == .dark ? 0.95 : 0.85))
+        } else {
+            Image(systemName: "photo")
+                .font(.system(size: size * 0.28, weight: .medium))
+                .foregroundStyle(Color.blue.opacity(colorScheme == .dark ? 0.7 : 0.55))
+        }
+    }
+}
+
 struct GoalsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var familyStore: FamilyStore
@@ -213,7 +321,7 @@ struct GoalsView: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(selectedKidID == nil ? Color.blue.opacity(0.18) : goalsFilterChipIdleBackground)
-                        .foregroundStyle(selectedKidID == nil ? Color.blue : Color.primary)
+                        .foregroundStyle(.primary)
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -222,13 +330,21 @@ struct GoalsView: View {
                     Button {
                         selectedKidID = kid.id
                     } label: {
-                        Text(kid.name)
-                            .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(selectedKidID == kid.id ? Color.blue.opacity(0.18) : goalsFilterChipIdleBackground)
-                            .foregroundStyle(selectedKidID == kid.id ? Color.blue : Color.primary)
-                            .clipShape(Capsule())
+                        HStack(spacing: 5) {
+                            KidStoredIconView(
+                                iconName: kid.icon,
+                                customImageData: kid.customImageData,
+                                size: 18,
+                                symbolAccentColor: kid.iconColor
+                            )
+                            Text(kid.name)
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(selectedKidID == kid.id ? Color.blue.opacity(0.18) : goalsFilterChipIdleBackground)
+                        .foregroundStyle(.primary)
+                        .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -332,6 +448,96 @@ struct GoalsView: View {
     }
 }
 
+private enum GoalTimeToGoLabel {
+    static func text(
+        goal: KidGoal,
+        kid: FamilyKid?,
+        language: AppLanguage,
+        locale: Locale,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> String? {
+        guard goal.targetAmount > 0 else { return nil }
+        let balance = max(0, kid?.currentBalance ?? 0)
+
+        if balance >= goal.targetAmount {
+            return AppStringCatalog.string(.goalsTimeToGoReached, language: language)
+        }
+
+        guard let kid else { return nil }
+        let remaining = goal.targetAmount - balance
+
+        guard kid.weeklyAllowance > 0 else {
+            return AppStringCatalog.string(.goalsTimeToGoNoAllowance, language: language)
+        }
+
+        guard let completionDate = ScheduledAllowanceProjection.completionDate(
+            for: kid,
+            remaining: remaining,
+            from: now,
+            calendar: calendar
+        ) else {
+            return AppStringCatalog.string(.goalsTimeToGoBeyondHorizon, language: language)
+        }
+
+        return formattedInterval(
+            from: now,
+            to: completionDate,
+            language: language,
+            locale: locale,
+            calendar: calendar
+        )
+    }
+
+    private static func formattedInterval(
+        from now: Date,
+        to completionDate: Date,
+        language: AppLanguage,
+        locale: Locale,
+        calendar: Calendar
+    ) -> String {
+        let start = calendar.startOfDay(for: now)
+        let end = calendar.startOfDay(for: completionDate)
+        let days = calendar.dateComponents([.day], from: start, to: end).day ?? 0
+
+        if days <= 0 {
+            return AppStringCatalog.string(.goalsTimeToGoToday, language: language)
+        }
+        if days == 1 {
+            return AppStringCatalog.string(.goalsTimeToGoOneDay, language: language)
+        }
+        if days < 7 {
+            return String(
+                format: AppStringCatalog.string(.goalsTimeToGoDaysFormat, language: language),
+                locale: locale,
+                arguments: [days]
+            )
+        }
+
+        let weeks = max(1, (days + 6) / 7)
+        if days < 45 {
+            if weeks == 1 {
+                return AppStringCatalog.string(.goalsTimeToGoOneWeek, language: language)
+            }
+            return String(
+                format: AppStringCatalog.string(.goalsTimeToGoWeeksFormat, language: language),
+                locale: locale,
+                arguments: [weeks]
+            )
+        }
+
+        let months = max(1, (days + 14) / 30)
+        if months == 1 {
+            return AppStringCatalog.string(.goalsTimeToGoOneMonth, language: language)
+        }
+        return String(
+            format: AppStringCatalog.string(.goalsTimeToGoMonthsFormat, language: language),
+            locale: locale,
+            arguments: [months]
+        )
+    }
+}
+
 private struct GoalRowView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var currencyManager: CurrencyManager
@@ -345,67 +551,189 @@ private struct GoalRowView: View {
         return min(1, balance / goal.targetAmount)
     }
 
-    var body: some View {
-        HStack(spacing: 14) {
-            ZStack(alignment: .topTrailing) {
-                Group {
-                    if let data = goal.imageData, let image = UIImage(data: data) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 84, height: 84)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    } else if let icon = goal.iconSystemName {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.blue.opacity(0.15))
-                            .frame(width: 84, height: 84)
-                            .overlay(
-                                Image(systemName: icon)
-                                    .font(.title2)
-                                    .foregroundStyle(.blue)
-                            )
-                    } else {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.blue.opacity(0.15))
-                            .frame(width: 84, height: 84)
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .font(.title2)
-                                    .foregroundStyle(.blue)
-                            )
-                    }
-                }
+    private var timeToGoLabel: String? {
+        GoalTimeToGoLabel.text(
+            goal: goal,
+            kid: kid,
+            language: languageManager.language,
+            locale: languageManager.locale
+        )
+    }
 
-                if let kid {
-                    kidProfileBadge(kid: kid)
-                        .padding(4)
-                }
-            }
-            .frame(width: 84, height: 84)
+    private enum GoalProgressColorTier: Equatable {
+        case neutralBlue
+        case warmOrange
+        case green
+    }
+
+    /// 0–30% blue, 30–70% orange, 70–100% green (boundaries: 30% → orange, 70% → green).
+    private var progressColorTier: GoalProgressColorTier {
+        if progress < 0.3 { return .neutralBlue }
+        if progress < 0.7 { return .warmOrange }
+        return .green
+    }
+
+    private var progressPercentText: String {
+        "\(Int((progress * 100).rounded()))%"
+    }
+
+    private var kidPossessiveGoalTitle: String? {
+        guard let name = kid?.name.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+            return nil
+        }
+        return String(
+            format: languageManager.text(.goalsKidPossessiveGoalFormat),
+            locale: languageManager.locale,
+            arguments: [name]
+        )
+    }
+
+    private var progressPercentForeground: Color {
+        switch progressColorTier {
+        case .neutralBlue:
+            return Color(red: 0.26, green: 0.48, blue: 0.78)
+        case .warmOrange:
+            return Color(red: 0.92, green: 0.48, blue: 0.12)
+        case .green:
+            return Color.appGreen
+        }
+    }
+
+    private var progressTrackGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.secondary.opacity(colorScheme == .dark ? 0.22 : 0.12),
+                Color.secondary.opacity(colorScheme == .dark ? 0.34 : 0.2)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var progressFillGradient: LinearGradient {
+        switch progressColorTier {
+        case .neutralBlue:
+            return LinearGradient(
+                colors: [
+                    Color(red: 0.45, green: 0.65, blue: 0.95).opacity(0.78),
+                    Color(red: 0.22, green: 0.45, blue: 0.78).opacity(0.95),
+                    Color(red: 0.18, green: 0.38, blue: 0.72)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        case .warmOrange:
+            return LinearGradient(
+                colors: [
+                    Color(red: 1.0, green: 0.78, blue: 0.45).opacity(0.95),
+                    Color(red: 0.98, green: 0.55, blue: 0.2),
+                    Color(red: 0.88, green: 0.42, blue: 0.08)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        case .green:
+            return LinearGradient(
+                colors: [
+                    Color.appGreen.opacity(0.68),
+                    Color.appGreen.opacity(0.92),
+                    Color.appGreen
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        }
+    }
+
+    private var progressHighCompletionGlow: (color: Color, radius: CGFloat) {
+        guard progressColorTier == .green else {
+            return (.clear, 0)
+        }
+        let intensity = min(1, (progress - 0.7) / 0.3)
+        let opacity = 0.22 + 0.38 * intensity
+        let radius: CGFloat = 4 + 6 * intensity
+        return (Color.appGreen.opacity(opacity), radius)
+    }
+
+    private let progressPercentReserveWidth: CGFloat = 48
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            GoalThumbnailView(
+                imageData: goal.imageData,
+                iconSystemName: goal.iconSystemName,
+                size: GoalThumbnailMetrics.listSize
+            )
 
             VStack(alignment: .leading, spacing: 8) {
+                if let kidPossessiveGoalTitle {
+                    HStack(spacing: 8) {
+                        if let kid {
+                            kidProfileBadge(kid: kid)
+                        }
+                        Text(kidPossessiveGoalTitle)
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .padding(.trailing, progressPercentReserveWidth)
+                }
+
                 Text(goal.title)
                     .font(.headline)
                     .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.trailing, progressPercentReserveWidth)
 
-                ProgressView(value: progress)
-                    .tint(progress >= 1 ? .green : .blue)
-
-                HStack {
-                    Text(String(format: languageManager.text(.goalsPercentCompleteFormat), locale: languageManager.locale, arguments: [Int((progress * 100).rounded())]))
+                if let timeToGoLabel {
+                    Text(timeToGoLabel)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(currencyManager.formatAmount(kid?.currentBalance ?? 0) + " / " + currencyManager.formatAmount(goal.targetAmount))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fontWeight(.medium)
+                        .foregroundStyle(progress >= 1 ? Color.appGreen : Color.secondary)
                 }
+
+                Text(currencyManager.formatAmount(kid?.currentBalance ?? 0) + " / " + currencyManager.formatAmount(goal.targetAmount))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Spacer(minLength: 0)
+
+                GeometryReader { geometry in
+                    let fillWidth = max(0, geometry.size.width * progress)
+                    let glow = progressHighCompletionGlow
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(progressTrackGradient)
+                        Capsule()
+                            .fill(progressFillGradient)
+                            .frame(width: fillWidth)
+                            .shadow(
+                                color: progressColorTier == .green ? glow.color : .clear,
+                                radius: progressColorTier == .green ? glow.radius : 0,
+                                x: 0,
+                                y: 0
+                            )
+                    }
+                }
+                .frame(height: 9)
             }
+            .frame(minHeight: 84, alignment: .top)
         }
         .padding()
         .background(colorScheme == .dark ? Color(.systemGray6) : Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(alignment: .topTrailing) {
+            Text(progressPercentText)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(progressPercentForeground)
+                .padding(.top, 14)
+                .padding(.trailing, 14)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 14)
                 .stroke(colorScheme == .dark ? Color(.systemGray4) : Color.clear, lineWidth: 1)
@@ -425,6 +753,7 @@ private struct GoalRowView: View {
             Circle()
                 .strokeBorder(Color(.systemBackground), lineWidth: 2)
         )
+        .shadow(color: .black.opacity(0.12), radius: 4, x: 0, y: 2)
     }
 }
 
@@ -435,6 +764,7 @@ private struct AddGoalView: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var familyStore: FamilyStore
     @EnvironmentObject var currencyManager: CurrencyManager
     @EnvironmentObject var languageManager: LanguageManager
@@ -459,6 +789,11 @@ private struct AddGoalView: View {
     }
 
     private var kids: [FamilyKid] { familyStore.kids }
+
+    private var selectedKid: FamilyKid? {
+        guard let selectedKidId else { return nil }
+        return kids.first(where: { $0.id == selectedKidId })
+    }
 
     private var isTitleValid: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -491,68 +826,89 @@ private struct AddGoalView: View {
                     onTrailing: { saveGoal() }
                 )
                 Form {
-                Section(languageManager.text(.goalsSectionGoal)) {
-                    Picker(languageManager.text(.goalsPickerKid), selection: $selectedKidId) {
-                        ForEach(kids) { kid in
-                            Text(kid.name).tag(Optional(kid.id))
-                        }
-                    }
-                    .tint(attemptedSave && !isKidValid ? .red : .blue)
-
-                    TextField(
-                        "",
-                        text: $title,
-                        prompt: Text(attemptedSave && !isTitleValid ? languageManager.text(.goalsGoalTitleRequired) : languageManager.text(.goalsGoalTitlePlaceholder))
-                            .foregroundColor(attemptedSave && !isTitleValid ? .red : .secondary)
-                    )
-                        .autocorrectionDisabled(true)
-                        .textInputAutocapitalization(.never)
-                        .foregroundStyle(.primary)
-
-                    HStack(spacing: 8) {
-                        Text(currencyManager.getCurrencySymbol())
-                            .foregroundStyle(attemptedSave && !isAmountValid ? .red : .secondary)
-                        TextField(
-                            "",
-                            text: $targetAmount,
-                            prompt: Text(attemptedSave && !isAmountValid ? languageManager.text(.goalsTargetRequired) : languageManager.text(.goalsTargetPlaceholder))
-                                .foregroundColor(attemptedSave && !isAmountValid ? .red : .secondary)
+                Section(languageManager.text(.goalsGoalName)) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.blue.opacity(colorScheme == .dark ? 0.2 : 0.14))
+                        KidCenteredTextInputRow(
+                            text: $title,
+                            isValid: isTitleValid,
+                            showErrorAppearance: attemptedSave,
+                            placeholderOK: languageManager.text(.goalsGoalTitlePlaceholder),
+                            placeholderError: languageManager.text(.goalsGoalTitleRequired)
                         )
-                            .keyboardType(.decimalPad)
-                            .autocorrectionDisabled(true)
-                            .textInputAutocapitalization(.never)
-                            .foregroundStyle(.primary)
-                            .onChange(of: targetAmount) { _, newValue in
-                                targetAmount = sanitizeNumericInput(newValue)
+                        .frame(minHeight: 48)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+
+                Section(languageManager.text(.goalsCost)) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.blue.opacity(colorScheme == .dark ? 0.2 : 0.14))
+                        KidAllowanceInputRow(
+                            text: $targetAmount,
+                            symbol: currencyManager.getCurrencySymbol(),
+                            isValid: isAmountValid,
+                            showErrorAppearance: attemptedSave,
+                            placeholderOK: "0.00",
+                            placeholderError: languageManager.text(.goalsTargetRequired)
+                        )
+                        .frame(minHeight: 48)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .onChange(of: targetAmount) { _, newValue in
+                    targetAmount = sanitizeNumericInput(newValue)
+                }
+
+                Section {
+                    ForEach(kids) { kid in
+                        Button {
+                            if selectedKidId == kid.id {
+                                selectedKidId = nil
+                            } else {
+                                selectedKidId = kid.id
                             }
+                        } label: {
+                            HStack {
+                                Text(kid.name)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                Image(systemName: selectedKidId == kid.id ? "checkmark.square.fill" : "square")
+                                    .foregroundStyle(selectedKidId == kid.id ? .blue : .secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if let selectedKid {
+                        SelectedKidsOverlappingAvatars(kids: [selectedKid])
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 30)
+                            .padding(.bottom, 12)
+                            .padding(.horizontal, 8)
+                            .listRowSeparator(.hidden)
+                    }
+                } header: {
+                    Text(languageManager.text(.familyKidsSection))
+                        .foregroundStyle(attemptedSave && !isKidValid ? .red : .primary)
+                } footer: {
+                    if attemptedSave && !isKidValid {
+                        Text(languageManager.text(.goalsKidRequired))
+                            .foregroundStyle(.red)
                     }
                 }
 
                 Section(languageManager.text(.goalsSectionPhoto)) {
                     HStack(spacing: 12) {
-                        if let selectedImage {
-                            Image(uiImage: selectedImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 60, height: 60)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                        } else if let selectedIcon {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color.blue.opacity(0.15))
-                                .frame(width: 60, height: 60)
-                                .overlay(
-                                    Image(systemName: selectedIcon)
-                                        .foregroundStyle(.blue)
-                                )
-                        } else {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color.blue.opacity(0.15))
-                                .frame(width: 60, height: 60)
-                                .overlay(
-                                    Image(systemName: "photo")
-                                        .foregroundStyle(.blue)
-                                )
-                        }
+                        GoalThumbnailView(
+                            previewImage: selectedImage,
+                            iconSystemName: selectedIcon,
+                            size: 60,
+                            cornerRadius: 10
+                        )
 
                         Button(attemptedSave && !isVisualValid ? languageManager.text(.goalsPhotoRequired) : languageManager.text(.goalsAddPhoto)) {
                             showingAssetPicker = true
@@ -635,7 +991,7 @@ private struct AddGoalView: View {
             kidId: selectedKidId,
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             targetAmount: amount,
-            imageData: selectedImage?.jpegData(compressionQuality: 0.8),
+            imageData: GoalImageEncoding.data(from: selectedImage),
             iconSystemName: selectedIcon,
             createdAt: createdAt
         )
@@ -760,18 +1116,15 @@ private struct GoalAssetPickerView: View {
                     VStack(spacing: 20) {
                         Spacer()
 
-                        if let selectedImage {
-                            Image(uiImage: selectedImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 120, height: 120)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.blue, lineWidth: 3))
-                        } else {
-                            Image(systemName: "photo")
-                                .font(.system(size: 58))
-                                .foregroundColor(.gray)
-                        }
+                        GoalThumbnailView(
+                            previewImage: selectedImage,
+                            size: 120,
+                            cornerRadius: GoalThumbnailMetrics.cornerRadius
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: GoalThumbnailMetrics.cornerRadius, style: .continuous)
+                                .stroke(selectedImage != nil ? Color.blue : Color.clear, lineWidth: 3)
+                        )
 
                         Button(selectedImage == nil ? languageManager.text(.iconPickerSelectImage) : languageManager.text(.iconPickerChangeImage)) {
                             showingImagePicker = true

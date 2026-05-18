@@ -438,7 +438,7 @@ struct FamilyBulkTransactionView: View {
 }
 
 /// Stacked profile photos for selected kids (same sources as Add/Edit kid).
-private struct SelectedKidsOverlappingAvatars: View {
+struct SelectedKidsOverlappingAvatars: View {
     let kids: [FamilyKid]
     var avatarSize: CGFloat = 72
     /// Each avatar to the right covers this fraction of the previous one (0.7 → 30% of prior photo still visible).
@@ -524,7 +524,7 @@ private struct FamilyKidRow: View {
 }
 
 /// Allowance amount + currency symbol, centered as a unit (SwiftUI `TextField` + `Form` layout fights horizontal centering).
-private struct KidAllowanceInputRow: UIViewRepresentable {
+struct KidAllowanceInputRow: UIViewRepresentable {
     @Binding var text: String
     let symbol: String
     let isValid: Bool
@@ -653,7 +653,120 @@ private struct KidAllowanceInputRow: UIViewRepresentable {
     }
 }
 
-/// Monthly interest percent (1–30): **value + %** is centered in the pill; chevrons sit just outside that group.
+/// Centered bold text field for form pills (e.g. goal name), matching `KidAllowanceInputRow` layout.
+struct KidCenteredTextInputRow: UIViewRepresentable {
+    @Binding var text: String
+    let isValid: Bool
+    let showErrorAppearance: Bool
+    let placeholderOK: String
+    let placeholderError: String
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeUIView(context: Context) -> UIView {
+        let container = UIView()
+        container.backgroundColor = .clear
+
+        let textField = UITextField()
+        textField.translatesAutoresizingMaskIntoConstraints = false
+        textField.borderStyle = .none
+        textField.textAlignment = .center
+        textField.adjustsFontForContentSizeCategory = true
+        textField.keyboardType = .default
+        textField.autocorrectionType = .no
+        textField.autocapitalizationType = .none
+        textField.returnKeyType = .done
+        textField.delegate = context.coordinator
+        textField.addTarget(context.coordinator, action: #selector(Coordinator.editingChanged(_:)), for: .editingChanged)
+
+        container.addSubview(textField)
+
+        let widthConstraint = textField.widthAnchor.constraint(equalToConstant: 120)
+        widthConstraint.priority = .required
+
+        NSLayoutConstraint.activate([
+            textField.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            textField.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            container.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            widthConstraint,
+        ])
+
+        context.coordinator.textField = textField
+        context.coordinator.widthConstraint = widthConstraint
+        context.coordinator.applyAll()
+        return container
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.parent = self
+        context.coordinator.applyAll()
+    }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        var parent: KidCenteredTextInputRow
+        weak var textField: UITextField?
+        var widthConstraint: NSLayoutConstraint?
+
+        init(_ parent: KidCenteredTextInputRow) {
+            self.parent = parent
+        }
+
+        private static func boldBodyFont() -> UIFont {
+            let base = UIFont.preferredFont(forTextStyle: .body)
+            if let descriptor = base.fontDescriptor.withSymbolicTraits(.traitBold) {
+                return UIFont(descriptor: descriptor, size: 0)
+            }
+            return base
+        }
+
+        func applyAll() {
+            guard let textField else { return }
+            let font = Self.boldBodyFont()
+            textField.font = font
+
+            let showInvalid = parent.showErrorAppearance && !parent.isValid
+            textField.textColor = showInvalid ? .systemRed : .label
+            textField.placeholder = showInvalid ? parent.placeholderError : parent.placeholderOK
+            textField.attributedPlaceholder = NSAttributedString(
+                string: textField.placeholder ?? "",
+                attributes: [
+                    .foregroundColor: showInvalid ? UIColor.systemRed : UIColor.secondaryLabel,
+                    .font: font,
+                ]
+            )
+
+            if textField.text != parent.text {
+                textField.text = parent.text
+            }
+
+            updateTextFieldWidth()
+        }
+
+        func updateTextFieldWidth() {
+            guard let textField, let widthConstraint else { return }
+            let font = textField.font ?? Self.boldBodyFont()
+            let raw = textField.text ?? ""
+            let measure: String = {
+                if raw.isEmpty {
+                    return textField.placeholder ?? parent.placeholderOK
+                }
+                return raw
+            }()
+            let w = (measure as NSString).size(withAttributes: [.font: font]).width
+            widthConstraint.constant = max(80, min(280, ceil(w) + 24))
+            textField.layoutIfNeeded()
+        }
+
+        @objc func editingChanged(_ sender: UITextField) {
+            parent.text = sender.text ?? ""
+            updateTextFieldWidth()
+        }
+    }
+}
+
+/// Monthly interest percent (0–30): **value + %** is centered in the pill; chevrons sit just outside that group.
 private struct KidPercentInputRow: UIViewRepresentable {
     @Binding var percent: Int
 
@@ -801,7 +914,7 @@ private struct KidPercentInputRow: UIViewRepresentable {
             symbolLabel.text = "%"
 
             upButton?.isEnabled = parent.percent < 30
-            downButton?.isEnabled = parent.percent > 1
+            downButton?.isEnabled = parent.percent > 0
 
             updateTextFieldWidth()
         }
@@ -825,22 +938,22 @@ private struct KidPercentInputRow: UIViewRepresentable {
 
         @objc func stepDown() {
             textField?.resignFirstResponder()
-            parent.percent = max(1, parent.percent - 1)
+            parent.percent = max(0, parent.percent - 1)
             applyAll()
         }
 
         @objc func editingChanged(_ sender: UITextField) {
             let digits = (sender.text ?? "").filter { $0.isNumber }
             guard !digits.isEmpty else {
-                parent.percent = 1
-                sender.text = "1"
+                parent.percent = 0
+                sender.text = "0"
                 updateTextFieldWidth()
                 applyAll()
                 return
             }
-            var v = Int(digits) ?? 1
+            var v = Int(digits) ?? 0
             if v > 30 { v = 30 }
-            if v < 1 { v = 1 }
+            if v < 0 { v = 0 }
             parent.percent = v
             let display = "\(v)"
             if sender.text != display {
@@ -886,19 +999,8 @@ struct AddEditKidView: View {
     @State private var depositTime = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     @State private var showingDepositTimePicker = false
     @State private var showingDeleteConfirmation = false
-    @State private var monthlyInterestPercent = 1
+    @State private var monthlyInterestPercent = 5
     @State private var attemptedSave = false
-
-    /// "Happy Birthday" when a birthday is set and its month/day matches **today** (all day until the next calendar day). `referenceNow` comes from `TimelineView` so the label can update at midnight while this screen is open.
-    private func birthdayRowLabelText(referenceNow: Date) -> String {
-        guard birthdayIsSet, let b = birthday else {
-            return languageManager.text(.kidBirthday)
-        }
-        if FamilyKid.isBirthday(birth: b, on: referenceNow) {
-            return languageManager.text(.kidBirthdayToday)
-        }
-        return languageManager.text(.kidBirthday)
-    }
 
     /// Stable placeholder for the picker when no birthday is saved (must not depend on `Date()`).
     private static var fixedBirthdayPlaceholder: Date {
@@ -1072,14 +1174,9 @@ struct AddEditKidView: View {
                     .padding(.bottom, 12)
 
                 HStack(alignment: .center, spacing: 8) {
-                    TimelineView(.periodic(from: Date(), by: 60)) { context in
-                        Text(birthdayRowLabelText(referenceNow: context.date))
-                            .foregroundStyle(.primary)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.75)
-                            .layoutPriority(1)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    Text(languageManager.text(.kidBirthday))
+                        .foregroundStyle(.primary)
+                        .layoutPriority(1)
                     Spacer(minLength: 0)
                     DatePicker(
                         "",
@@ -1474,7 +1571,7 @@ struct FamilyKid: Identifiable {
     }
 
     /// Percent applied on the 1st of each month (1–30).
-    var monthlyInterestPercent: Int = 1
+    var monthlyInterestPercent: Int = 5
     /// `yyyy-MM` of the last month for which interest was evaluated (set after processing on the 1st).
     var lastInterestAppliedMonthKey: String?
     /// Last time scheduled allowance was auto-credited (prevents duplicate same day/week/month).
@@ -1531,8 +1628,8 @@ extension FamilyKid: Codable {
         depositMonthlyDay = Self.normalizedMonthlyPayDay(rawMonthlyDay)
         depositTime = try container.decodeIfPresent(Date.self, forKey: .depositTime)
             ?? Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
-        let rawPercent = try container.decodeIfPresent(Int.self, forKey: .monthlyInterestPercent) ?? 1
-        monthlyInterestPercent = min(30, max(1, rawPercent))
+        let rawPercent = try container.decodeIfPresent(Int.self, forKey: .monthlyInterestPercent) ?? 5
+        monthlyInterestPercent = min(30, max(0, rawPercent))
         lastInterestAppliedMonthKey = try container.decodeIfPresent(String.self, forKey: .lastInterestAppliedMonthKey)
         lastScheduledAllowancePaymentAt = try container.decodeIfPresent(Date.self, forKey: .lastScheduledAllowancePaymentAt)
     }

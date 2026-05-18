@@ -14,6 +14,16 @@ struct FamilyHistoryEntry: Identifiable, Codable {
     let iconSystemName: String
     let kidId: UUID?
     let kidName: String?
+
+    /// Detail without a leading kid name (shown separately in the UI).
+    var displayDetail: String {
+        guard let kidName, !kidName.isEmpty else { return detail }
+        let prefix = "\(kidName) · "
+        if detail.hasPrefix(prefix) {
+            return String(detail.dropFirst(prefix.count))
+        }
+        return detail
+    }
 }
 
 /// Central catalog of all events that create a history record.
@@ -113,7 +123,7 @@ final class HistoryStore: ObservableObject {
         let amt = Self.groupedAmountString(targetAmount)
         append(
             title: FamilyHistoryEvent.goalAdded.title,
-            detail: "\(kidName) · \(goalTitle) · \(amt)",
+            detail: "\(goalTitle) · \(amt)",
             iconSystemName: FamilyHistoryEvent.goalAdded.iconSystemName,
             kidId: kidId,
             kidName: kidName
@@ -124,7 +134,7 @@ final class HistoryStore: ObservableObject {
         let amt = Self.groupedAmountString(amount)
         append(
             title: FamilyHistoryEvent.scheduledAllowancePaid.title,
-            detail: "\(kidName) · +\(amt) · \(scheduleLabel)",
+            detail: "+\(amt) · \(scheduleLabel)",
             iconSystemName: FamilyHistoryEvent.scheduledAllowancePaid.iconSystemName,
             kidId: kidId,
             kidName: kidName
@@ -135,7 +145,7 @@ final class HistoryStore: ObservableObject {
         let amt = Self.groupedAmountString(amount)
         append(
             title: FamilyHistoryEvent.monthlyInterestCredited.title,
-            detail: "\(kidName) · \(percent)% · +\(amt)",
+            detail: "\(percent)% · +\(amt)",
             iconSystemName: FamilyHistoryEvent.monthlyInterestCredited.iconSystemName,
             kidId: kidId,
             kidName: kidName
@@ -144,7 +154,7 @@ final class HistoryStore: ObservableObject {
 
     func recordManualDeposit(kidId: UUID, kidName: String, amount: Double, note: String) {
         let amt = Self.groupedAmountString(amount)
-        var detail = "\(kidName) · +\(amt)"
+        var detail = "+\(amt)"
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
             detail += " · \(trimmed)"
@@ -160,7 +170,7 @@ final class HistoryStore: ObservableObject {
 
     func recordManualWithdraw(kidId: UUID, kidName: String, amount: Double, note: String) {
         let amt = Self.groupedAmountString(amount)
-        var detail = "\(kidName) · −\(amt)"
+        var detail = "−\(amt)"
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
             detail += " · \(trimmed)"

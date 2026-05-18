@@ -165,6 +165,12 @@ enum InsightsFactsBuilder {
             )
         }
 
+        appendBiggestSpenderAndSaverFacts(
+            monthEvents: monthEvents,
+            to: &facts,
+            context: context
+        )
+
         let weekDeposits = weekEvents.filter { $0.isDeposit && !$0.isInterest }.reduce(0) { $0 + $1.amount }
         if weekDeposits > 0 {
             let amount = context.formatAmount(weekDeposits)
@@ -218,13 +224,10 @@ enum InsightsFactsBuilder {
                                         arguments: [kid.name]
                                     )),
                                     .amount(remaining),
-                                    .plain(String(
-                                        format: AppStringCatalog.string(.insightsFactGoalAlmostTrail, language: context.language),
-                                        locale: context.locale,
-                                        arguments: [goal.title]
-                                    )),
+                                    .plain(AppStringCatalog.string(.insightsFactGoalAlmostTrail, language: context.language)),
                                 ],
-                                symbolName: "flag.checkered"
+                                symbolName: "flag.checkered",
+                                highlightedGoalTitle: goal.title
                             )
                         )
                     }
@@ -292,6 +295,77 @@ enum InsightsFactsBuilder {
         }
 
         return facts
+    }
+
+    private static func appendBiggestSpenderAndSaverFacts(
+        monthEvents: [InsightsFactEvent],
+        to facts: inout [InsightFact],
+        context: Context
+    ) {
+        var depositsByKid: [UUID: Double] = [:]
+        var withdrawalsByKid: [UUID: Double] = [:]
+        var namesByKid: [UUID: String] = [:]
+
+        for event in monthEvents where !event.isInterest {
+            namesByKid[event.kidId] = event.kidName
+            if event.isDeposit {
+                depositsByKid[event.kidId, default: 0] += event.amount
+            } else {
+                withdrawalsByKid[event.kidId, default: 0] += event.amount
+            }
+        }
+
+        if let topSpender = withdrawalsByKid.max(by: { lhs, rhs in
+            if lhs.value == rhs.value {
+                let left = namesByKid[lhs.key] ?? ""
+                let right = namesByKid[rhs.key] ?? ""
+                return left.localizedCaseInsensitiveCompare(right) == .orderedDescending
+            }
+            return lhs.value < rhs.value
+        }), topSpender.value > 0, let name = namesByKid[topSpender.key] {
+            let amount = context.formatAmount(topSpender.value)
+            facts.append(
+                InsightFact(
+                    id: "biggest-spender-\(topSpender.key.uuidString)",
+                    parts: partsHighlightingAmount(
+                        format: AppStringCatalog.string(.insightsFactBiggestSpender, language: context.language),
+                        locale: context.locale,
+                        amount: amount,
+                        leadingArguments: [name]
+                    ),
+                    symbolName: "arrow.up.circle.fill"
+                )
+            )
+        }
+
+        var netByKid: [(kidId: UUID, name: String, net: Double)] = []
+        let kidIds = Set(depositsByKid.keys).union(withdrawalsByKid.keys)
+        for kidId in kidIds {
+            let net = (depositsByKid[kidId] ?? 0) - (withdrawalsByKid[kidId] ?? 0)
+            guard net > 0, let name = namesByKid[kidId] else { continue }
+            netByKid.append((kidId: kidId, name: name, net: net))
+        }
+
+        if let topSaver = netByKid.max(by: { lhs, rhs in
+            if lhs.net == rhs.net {
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedDescending
+            }
+            return lhs.net < rhs.net
+        }) {
+            let amount = context.formatAmount(topSaver.net)
+            facts.append(
+                InsightFact(
+                    id: "biggest-saver-\(topSaver.kidId.uuidString)",
+                    parts: partsHighlightingAmount(
+                        format: AppStringCatalog.string(.insightsFactBiggestSaver, language: context.language),
+                        locale: context.locale,
+                        amount: amount,
+                        leadingArguments: [topSaver.name]
+                    ),
+                    symbolName: "arrow.down.circle.fill"
+                )
+            )
+        }
     }
 
     private static func partsHighlightingAmount(
