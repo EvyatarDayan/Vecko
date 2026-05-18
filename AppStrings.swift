@@ -39,6 +39,7 @@ enum AppStringKey {
     case familyNoKidsTitle
     case familyNoKidsSubtitle
     case familyKidsSection
+    case familySelectKids
     case familySelectAll
     case familyBulkAmount, familyBulkNote
     case familyBulkAmountRequired, familyBulkNoteRequired, familyBulkKidsRequired
@@ -93,13 +94,14 @@ enum AppStringKey {
     case goalsTimeToGoNoAllowance
     case goalsTimeToGoBeyondHorizon
     case goalsSectionGoal, goalsSectionPhoto
-    case goalsCost, goalsGoalName, goalsKidRequired
+    case goalsCost, goalsGoalName, goalsSelectKid, goalsKidRequired
     case goalsPickerKid
     case goalsGoalTitlePlaceholder, goalsGoalTitleRequired
     case goalsTargetPlaceholder, goalsTargetRequired
     case goalsAddPhoto, goalsPhotoRequired
     case goalsNavNew, goalsNavEdit
     case goalsDeleteFromDetail, goalsDeleteGoalConfirmTitle, goalsDeleteGoalConfirmMessage
+    case goalsDetailInfoAccessibility
 
     // Insights / history UI
     case insightsTitle, insightsSubtitle
@@ -251,6 +253,7 @@ enum AppStringCatalog {
         case .familyNoKidsTitle: return t(language, en: "No kids info yet", sv: "Ingen barninfo ännu", es: "Aún no hay información", fr: "Pas encore d’informations", de: "Noch keine Kinderinfos")
         case .familyNoKidsSubtitle: return t(language, en: "Tap + to add your first allowance details.", sv: "Tryck på + för att lägga till ditt första veckopengs­upplägg.", es: "Toca + para añadir tu primera paga.", fr: "Appuyez sur + pour ajouter la première allocation.", de: "Tippe auf +, um dein erstes Taschengeld anzulegen.")
         case .familyKidsSection: return t(language, en: "Kids", sv: "Barn", es: "Niños", fr: "Enfants", de: "Kinder")
+        case .familySelectKids: return t(language, en: "Select kids", sv: "Välj barn", es: "Seleccionar niños", fr: "Sélectionner des enfants", de: "Kinder auswählen")
         case .familySelectAll: return t(language, en: "Select all", sv: "Välj alla", es: "Seleccionar todo", fr: "Tout sélectionner", de: "Alle auswählen")
         case .familyBulkAmount: return t(language, en: "Amount", sv: "Belopp", es: "Importe", fr: "Montant", de: "Betrag")
         case .familyBulkNote: return t(language, en: "Note", sv: "Anteckning", es: "Nota", fr: "Note", de: "Notiz")
@@ -325,13 +328,14 @@ enum AppStringCatalog {
         case .goalsSectionGoal: return t(language, en: "Goal", sv: "Mål", es: "Meta", fr: "Objectif", de: "Ziel")
         case .goalsSectionPhoto: return t(language, en: "Photo", sv: "Foto", es: "Foto", fr: "Photo", de: "Foto")
         case .goalsCost: return t(language, en: "Cost", sv: "Kostnad", es: "Coste", fr: "Coût", de: "Kosten")
-        case .goalsGoalName: return t(language, en: "Goal name", sv: "Målnamn", es: "Nombre de la meta", fr: "Nom de l’objectif", de: "Zielname")
-        case .goalsKidRequired: return t(language, en: "Select a kid", sv: "Välj ett barn", es: "Selecciona un niño", fr: "Sélectionnez un enfant", de: "Kind auswählen")
+        case .goalsGoalName: return t(language, en: "Goal title", sv: "Måltitel", es: "Título de la meta", fr: "Titre de l’objectif", de: "Zieltitel")
+        case .goalsSelectKid: return t(language, en: "Select kids", sv: "Välj barn", es: "Seleccionar niños", fr: "Sélectionner des enfants", de: "Kinder auswählen")
+        case .goalsKidRequired: return t(language, en: "Select at least one kid", sv: "Välj minst ett barn", es: "Selecciona al menos un niño", fr: "Sélectionnez au moins un enfant", de: "Mindestens ein Kind auswählen")
         case .goalsPickerKid: return t(language, en: "Kid", sv: "Barn", es: "Niño", fr: "Enfant", de: "Kind")
-        case .goalsGoalTitlePlaceholder: return t(language, en: "Goal name", sv: "Målnamn", es: "Nombre de la meta", fr: "Nom de l’objectif", de: "Zielname")
+        case .goalsGoalTitlePlaceholder: return t(language, en: "Goal title", sv: "Måltitel", es: "Título de la meta", fr: "Titre de l’objectif", de: "Zieltitel")
         case .goalsGoalTitleRequired: return t(language, en: "Goal title is required", sv: "Måltitel krävs", es: "El título es obligatorio", fr: "Le titre est requis", de: "Titel ist erforderlich")
         case .goalsTargetPlaceholder: return t(language, en: "Target amount", sv: "Målbelopp", es: "Importe objetivo", fr: "Montant cible", de: "Zielbetrag")
-        case .goalsTargetRequired: return t(language, en: "Target amount is required", sv: "Målbelopp krävs", es: "El importe objetivo es obligatorio", fr: "Le montant cible est requis", de: "Zielbetrag ist erforderlich")
+        case .goalsTargetRequired: return t(language, en: "Cost is required", sv: "Kostnad krävs", es: "El coste es obligatorio", fr: "Le coût est requis", de: "Kosten erforderlich")
         case .goalsAddPhoto: return t(language, en: "Add photo", sv: "Lägg till foto", es: "Añadir foto", fr: "Ajouter une photo", de: "Foto hinzufügen")
         case .goalsPhotoRequired: return t(language, en: "Photo or icon is required", sv: "Foto eller ikon krävs", es: "Se requiere foto o icono", fr: "Photo ou icône requise", de: "Foto oder Symbol erforderlich")
         case .goalsNavNew: return t(language, en: "New Goal", sv: "Nytt mål", es: "Nueva meta", fr: "Nouvel objectif", de: "Neues Ziel")
@@ -339,6 +343,7 @@ enum AppStringCatalog {
         case .goalsDeleteFromDetail: return t(language, en: "Delete goal", sv: "Ta bort mål", es: "Eliminar meta", fr: "Supprimer l’objectif", de: "Ziel löschen")
         case .goalsDeleteGoalConfirmTitle: return t(language, en: "Delete this goal?", sv: "Ta bort detta mål?", es: "¿Eliminar esta meta?", fr: "Supprimer cet objectif ?", de: "Dieses Ziel löschen?")
         case .goalsDeleteGoalConfirmMessage: return t(language, en: "This goal will be removed from your list. This cannot be undone.", sv: "Målet tas bort från listan. Detta kan inte ångras.", es: "La meta se eliminará de la lista. No se puede deshacer.", fr: "Cet objectif sera retiré de la liste. Action irréversible.", de: "Das Ziel wird aus der Liste entfernt. Das kann nicht rückgängig gemacht werden.")
+        case .goalsDetailInfoAccessibility: return t(language, en: "Goal details", sv: "Måldetaljer", es: "Detalles de la meta", fr: "Détails de l’objectif", de: "Zieldetails")
 
         case .insightsTitle: return t(language, en: "Insights", sv: "Insikter", es: "Resumen", fr: "Analyses", de: "Einblicke")
         case .insightsSubtitle: return t(language, en: "Review activity and trends", sv: "Se aktivitet och trender", es: "Revisa actividad y tendencias", fr: "Consultez l’activité et les tendances", de: "Aktivität und Trends ansehen")

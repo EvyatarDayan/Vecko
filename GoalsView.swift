@@ -188,6 +188,7 @@ struct GoalsView: View {
 
     @State private var showingAddGoal = false
     @State private var editingGoal: KidGoal?
+    @State private var detailGoal: KidGoal?
     @State private var selectedKidID: UUID?
 
     private var kids: [FamilyKid] { familyStore.kids }
@@ -223,6 +224,14 @@ struct GoalsView: View {
                 }
                 .sheet(item: $editingGoal) { goal in
                     editGoalSheet(goal: goal)
+                }
+                .sheet(item: $detailGoal) { goal in
+                    GoalDetailSheet(
+                        goal: goal,
+                        kid: kid(for: goal.kidId)
+                    )
+                    .environmentObject(currencyManager)
+                    .environmentObject(languageManager)
                 }
         }
     }
@@ -268,8 +277,19 @@ struct GoalsView: View {
     }
 
     private func editGoalSheet(goal: KidGoal) -> some View {
-        AddGoalView(mode: .edit(goal), onSave: { updated in
-            goalsStore.updateGoal(updated)
+        AddGoalView(mode: .edit(goal), onSave: { saved in
+            if goalsStore.goals.contains(where: { $0.id == saved.id }) {
+                goalsStore.updateGoal(saved)
+            } else {
+                goalsStore.addGoal(saved)
+                let kidName = familyStore.kids.first(where: { $0.id == saved.kidId })?.name ?? languageManager.text(.unknownKid)
+                historyStore.recordGoalAdded(
+                    kidId: saved.kidId,
+                    kidName: kidName,
+                    goalTitle: saved.title,
+                    targetAmount: saved.targetAmount
+                )
+            }
         }, onDelete: {
             goalsStore.removeGoal(id: goal.id)
         })
@@ -415,11 +435,15 @@ struct GoalsView: View {
 
     @ViewBuilder
     private func goalListRow(goal: KidGoal) -> some View {
-        GoalRowView(goal: goal, kid: kid(for: goal.kidId))
-            .contentShape(Rectangle())
-            .onTapGesture {
-                editingGoal = goal
-            }
+        GoalRowView(
+            goal: goal,
+            kid: kid(for: goal.kidId),
+            onInfo: { detailGoal = goal }
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            editingGoal = goal
+        }
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                 Button(role: .destructive) {
                     goalsStore.removeGoal(id: goal.id)
@@ -445,6 +469,32 @@ struct GoalsView: View {
 
     private func kid(for id: UUID) -> FamilyKid? {
         kids.first(where: { $0.id == id })
+    }
+}
+
+/// Shared goal progress colors: blue under 30%, orange 30–70%, green 70%+.
+private enum GoalProgressStyling {
+    enum Tier: Equatable {
+        case neutralBlue
+        case warmOrange
+        case green
+    }
+
+    static func tier(for progress: Double) -> Tier {
+        if progress < 0.3 { return .neutralBlue }
+        if progress < 0.7 { return .warmOrange }
+        return .green
+    }
+
+    static func percentColor(for progress: Double) -> Color {
+        switch tier(for: progress) {
+        case .neutralBlue:
+            return Color(red: 0.26, green: 0.48, blue: 0.78)
+        case .warmOrange:
+            return Color(red: 0.92, green: 0.48, blue: 0.12)
+        case .green:
+            return Color.appGreen
+        }
     }
 }
 
@@ -538,8 +588,8 @@ private enum GoalTimeToGoLabel {
     }
 }
 
-private struct GoalRowView: View {
-    @Environment(\.colorScheme) private var colorScheme
+private struct GoalDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var currencyManager: CurrencyManager
     @EnvironmentObject var languageManager: LanguageManager
     let goal: KidGoal
@@ -551,6 +601,14 @@ private struct GoalRowView: View {
         return min(1, balance / goal.targetAmount)
     }
 
+    private var progressPercentText: String {
+        String(
+            format: languageManager.text(.goalsPercentCompleteFormat),
+            locale: languageManager.locale,
+            arguments: [Int((progress * 100).rounded())]
+        )
+    }
+
     private var timeToGoLabel: String? {
         GoalTimeToGoLabel.text(
             goal: goal,
@@ -560,17 +618,107 @@ private struct GoalRowView: View {
         )
     }
 
-    private enum GoalProgressColorTier: Equatable {
-        case neutralBlue
-        case warmOrange
-        case green
+    private var kidPossessiveGoalTitle: String? {
+        guard let name = kid?.name.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+            return nil
+        }
+        return String(
+            format: languageManager.text(.goalsKidPossessiveGoalFormat),
+            locale: languageManager.locale,
+            arguments: [name]
+        )
     }
 
-    /// 0–30% blue, 30–70% orange, 70–100% green (boundaries: 30% → orange, 70% → green).
-    private var progressColorTier: GoalProgressColorTier {
-        if progress < 0.3 { return .neutralBlue }
-        if progress < 0.7 { return .warmOrange }
-        return .green
+    private var balanceLine: String {
+        currencyManager.formatAmount(kid?.currentBalance ?? 0)
+            + " / "
+            + currencyManager.formatAmount(goal.targetAmount)
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            ScrollView {
+                VStack(spacing: 14) {
+                    GoalThumbnailView(
+                        imageData: goal.imageData,
+                        iconSystemName: goal.iconSystemName,
+                        size: 88,
+                        cornerRadius: GoalThumbnailMetrics.cornerRadius
+                    )
+
+                    Text(goal.title)
+                        .font(.title3.weight(.semibold))
+                        .multilineTextAlignment(.center)
+
+                    if let kidPossessiveGoalTitle {
+                        HStack(spacing: 12) {
+                            if let kid {
+                                KidStoredIconView(
+                                    iconName: kid.icon,
+                                    customImageData: kid.customImageData,
+                                    size: 48,
+                                    symbolAccentColor: kid.iconColor
+                                )
+                            }
+                            Text(kidPossessiveGoalTitle)
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(.primary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    }
+
+                    Text(progressPercentText)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(GoalProgressStyling.percentColor(for: progress))
+                        .multilineTextAlignment(.center)
+
+                    Text(balanceLine)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.center)
+
+                    if let timeToGoLabel {
+                        Text(timeToGoLabel)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(progress >= 1 ? Color.appGreen : .secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+
+            Button {
+                dismiss()
+            } label: {
+                Text(languageManager.text(.historyGotIt))
+            }
+            .veckoPillActionStyle(foreground: .black)
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 43)
+        .padding(.bottom, 10)
+        .presentationDetents([.height(450)])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+private struct GoalRowView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject var currencyManager: CurrencyManager
+    @EnvironmentObject var languageManager: LanguageManager
+    let goal: KidGoal
+    let kid: FamilyKid?
+    let onInfo: () -> Void
+
+    private var progress: Double {
+        let balance = max(0, kid?.currentBalance ?? 0)
+        guard goal.targetAmount > 0 else { return 0 }
+        return min(1, balance / goal.targetAmount)
+    }
+
+    private var progressColorTier: GoalProgressStyling.Tier {
+        GoalProgressStyling.tier(for: progress)
     }
 
     private var progressPercentText: String {
@@ -589,14 +737,7 @@ private struct GoalRowView: View {
     }
 
     private var progressPercentForeground: Color {
-        switch progressColorTier {
-        case .neutralBlue:
-            return Color(red: 0.26, green: 0.48, blue: 0.78)
-        case .warmOrange:
-            return Color(red: 0.92, green: 0.48, blue: 0.12)
-        case .green:
-            return Color.appGreen
-        }
+        GoalProgressStyling.percentColor(for: progress)
     }
 
     private var progressTrackGradient: LinearGradient {
@@ -687,21 +828,6 @@ private struct GoalRowView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.trailing, progressPercentReserveWidth)
 
-                if let timeToGoLabel {
-                    Text(timeToGoLabel)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundStyle(progress >= 1 ? Color.appGreen : Color.secondary)
-                }
-
-                Text(currencyManager.formatAmount(kid?.currentBalance ?? 0) + " / " + currencyManager.formatAmount(goal.targetAmount))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Spacer(minLength: 0)
-
                 GeometryReader { geometry in
                     let fillWidth = max(0, geometry.size.width * progress)
                     let glow = progressHighCompletionGlow
@@ -722,6 +848,15 @@ private struct GoalRowView: View {
                 .frame(height: 9)
             }
             .frame(minHeight: 84, alignment: .top)
+
+            Button(action: onInfo) {
+                Image(systemName: "info.circle")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(languageManager.text(.goalsDetailInfoAccessibility))
         }
         .padding()
         .background(colorScheme == .dark ? Color(.systemGray6) : Color(.systemBackground))
@@ -773,7 +908,7 @@ private struct AddGoalView: View {
     let onSave: (KidGoal) -> Void
     let onDelete: (() -> Void)?
 
-    @State private var selectedKidId: UUID?
+    @State private var selectedKidIDs: Set<UUID>
     @State private var title = ""
     @State private var targetAmount = ""
     @State private var selectedImage: UIImage?
@@ -786,13 +921,43 @@ private struct AddGoalView: View {
         self.mode = mode
         self.onSave = onSave
         self.onDelete = onDelete
+
+        switch mode {
+        case .add(let defaultKidId):
+            var initialKidIDs = Set<UUID>()
+            if let defaultKidId {
+                initialKidIDs.insert(defaultKidId)
+            }
+            _selectedKidIDs = State(initialValue: initialKidIDs)
+            _title = State(initialValue: "")
+            _targetAmount = State(initialValue: "")
+            _selectedImage = State(initialValue: nil)
+            _selectedIcon = State(initialValue: nil)
+        case .edit(let goal):
+            _selectedKidIDs = State(initialValue: [goal.kidId])
+            _title = State(initialValue: goal.title)
+            _targetAmount = State(initialValue: String(format: "%.2f", goal.targetAmount))
+            _selectedIcon = State(initialValue: goal.iconSystemName)
+            if let data = goal.imageData, let image = UIImage(data: data) {
+                _selectedImage = State(initialValue: image)
+            } else {
+                _selectedImage = State(initialValue: nil)
+            }
+        }
     }
 
     private var kids: [FamilyKid] { familyStore.kids }
 
-    private var selectedKid: FamilyKid? {
-        guard let selectedKidId else { return nil }
-        return kids.first(where: { $0.id == selectedKidId })
+    private var allKidIDs: Set<UUID> {
+        Set(kids.map(\.id))
+    }
+
+    private var allSelected: Bool {
+        !allKidIDs.isEmpty && selectedKidIDs == allKidIDs
+    }
+
+    private var selectedKids: [FamilyKid] {
+        kids.filter { selectedKidIDs.contains($0.id) }
     }
 
     private var isTitleValid: Bool {
@@ -804,7 +969,7 @@ private struct AddGoalView: View {
     }
 
     private var isKidValid: Bool {
-        selectedKidId != nil
+        !selectedKidIDs.isEmpty
     }
 
     private var isVisualValid: Bool {
@@ -864,43 +1029,6 @@ private struct AddGoalView: View {
                     targetAmount = sanitizeNumericInput(newValue)
                 }
 
-                Section {
-                    ForEach(kids) { kid in
-                        Button {
-                            if selectedKidId == kid.id {
-                                selectedKidId = nil
-                            } else {
-                                selectedKidId = kid.id
-                            }
-                        } label: {
-                            HStack {
-                                Text(kid.name)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                Image(systemName: selectedKidId == kid.id ? "checkmark.square.fill" : "square")
-                                    .foregroundStyle(selectedKidId == kid.id ? .blue : .secondary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    if let selectedKid {
-                        SelectedKidsOverlappingAvatars(kids: [selectedKid])
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 30)
-                            .padding(.bottom, 12)
-                            .padding(.horizontal, 8)
-                            .listRowSeparator(.hidden)
-                    }
-                } header: {
-                    Text(languageManager.text(.familyKidsSection))
-                        .foregroundStyle(attemptedSave && !isKidValid ? .red : .primary)
-                } footer: {
-                    if attemptedSave && !isKidValid {
-                        Text(languageManager.text(.goalsKidRequired))
-                            .foregroundStyle(.red)
-                    }
-                }
-
                 Section(languageManager.text(.goalsSectionPhoto)) {
                     HStack(spacing: 12) {
                         GoalThumbnailView(
@@ -914,6 +1042,67 @@ private struct AddGoalView: View {
                             showingAssetPicker = true
                         }
                         .foregroundStyle(attemptedSave && !isVisualValid ? .red : .blue)
+                    }
+                }
+
+                Section {
+                    Button {
+                        if allSelected {
+                            selectedKidIDs.removeAll()
+                        } else {
+                            selectedKidIDs = allKidIDs
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Text(languageManager.text(.familySelectAll))
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: allSelected ? "checkmark.square.fill" : "square")
+                                .foregroundStyle(allSelected ? .blue : .secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .kidsSelectionListSeparatorInsets()
+
+                    ForEach(kids) { kid in
+                        Button {
+                            if selectedKidIDs.contains(kid.id) {
+                                selectedKidIDs.remove(kid.id)
+                            } else {
+                                selectedKidIDs.insert(kid.id)
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                KidStoredIconView(
+                                    iconName: kid.icon,
+                                    customImageData: kid.customImageData,
+                                    size: 28,
+                                    symbolAccentColor: kid.iconColor
+                                )
+                                Text(kid.name)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                Image(systemName: selectedKidIDs.contains(kid.id) ? "checkmark.square.fill" : "square")
+                                    .foregroundStyle(selectedKidIDs.contains(kid.id) ? .blue : .secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .kidsSelectionListSeparatorInsets()
+                    }
+
+                    if !selectedKids.isEmpty {
+                        SelectedKidsOverlappingAvatars(kids: selectedKids)
+                            .frame(maxWidth: .infinity)
+                            .listRowInsets(EdgeInsets(top: 10, leading: 8, bottom: 12, trailing: 8))
+                            .kidsSelectionListSeparatorInsets()
+                            .listRowSeparator(.hidden, edges: .bottom)
+                    }
+                } header: {
+                    Text(languageManager.text(.goalsSelectKid))
+                } footer: {
+                    if attemptedSave && !isKidValid {
+                        Text(languageManager.text(.goalsKidRequired))
+                            .foregroundStyle(.red)
                     }
                 }
 
@@ -937,24 +1126,6 @@ private struct AddGoalView: View {
             } message: {
                 Text(languageManager.text(.goalsDeleteGoalConfirmMessage))
             }
-            .onAppear {
-                switch mode {
-                case .add(let defaultKidId):
-                    if let defaultKidId, kids.contains(where: { $0.id == defaultKidId }) {
-                        selectedKidId = defaultKidId
-                    } else {
-                        selectedKidId = kids.first?.id
-                    }
-                case .edit(let goal):
-                    selectedKidId = kids.contains(where: { $0.id == goal.kidId }) ? goal.kidId : kids.first?.id
-                    title = goal.title
-                    targetAmount = String(format: "%.2f", goal.targetAmount)
-                    selectedIcon = goal.iconSystemName
-                    if let data = goal.imageData {
-                        selectedImage = UIImage(data: data)
-                    }
-                }
-            }
             .sheet(isPresented: $showingAssetPicker) {
                 GoalAssetPickerView(
                     selectedImage: $selectedImage,
@@ -974,28 +1145,43 @@ private struct AddGoalView: View {
 
     private func saveGoal() {
         attemptedSave = true
-        guard let selectedKidId, let amount = Double(targetAmount), amount > 0 else { return }
-        guard selectedImage != nil || selectedIcon != nil else { return }
-        let id: UUID
-        let createdAt: Date
+        guard isValid, let amount = Double(targetAmount) else { return }
+
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let imageData = GoalImageEncoding.data(from: selectedImage)
+
         switch mode {
         case .add:
-            id = UUID()
-            createdAt = Date()
+            for kidId in selectedKidIDs {
+                let goal = KidGoal(
+                    id: UUID(),
+                    kidId: kidId,
+                    title: trimmedTitle,
+                    targetAmount: amount,
+                    imageData: imageData,
+                    iconSystemName: selectedIcon,
+                    createdAt: Date()
+                )
+                onSave(goal)
+            }
         case .edit(let existing):
-            id = existing.id
-            createdAt = existing.createdAt
+            if !selectedKidIDs.contains(existing.kidId) {
+                onDelete?()
+            }
+            for kidId in selectedKidIDs {
+                let isExistingKid = kidId == existing.kidId
+                let goal = KidGoal(
+                    id: isExistingKid ? existing.id : UUID(),
+                    kidId: kidId,
+                    title: trimmedTitle,
+                    targetAmount: amount,
+                    imageData: imageData,
+                    iconSystemName: selectedIcon,
+                    createdAt: isExistingKid ? existing.createdAt : Date()
+                )
+                onSave(goal)
+            }
         }
-        let goal = KidGoal(
-            id: id,
-            kidId: selectedKidId,
-            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-            targetAmount: amount,
-            imageData: GoalImageEncoding.data(from: selectedImage),
-            iconSystemName: selectedIcon,
-            createdAt: createdAt
-        )
-        onSave(goal)
         dismiss()
     }
 

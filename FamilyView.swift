@@ -362,6 +362,24 @@ struct FamilyBulkTransactionView: View {
                 }
 
                 Section {
+                    Button {
+                        if allSelected {
+                            selectedKidIDs.removeAll()
+                        } else {
+                            selectedKidIDs = allKidIDs
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Text(languageManager.text(.familySelectAll))
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: allSelected ? "checkmark.square.fill" : "square")
+                                .foregroundStyle(allSelected ? .blue : .secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .kidsSelectionListSeparatorInsets()
+
                     ForEach(familyStore.kids) { kid in
                         Button {
                             if selectedKidIDs.contains(kid.id) {
@@ -370,7 +388,13 @@ struct FamilyBulkTransactionView: View {
                                 selectedKidIDs.insert(kid.id)
                             }
                         } label: {
-                            HStack {
+                            HStack(spacing: 10) {
+                                KidStoredIconView(
+                                    iconName: kid.icon,
+                                    customImageData: kid.customImageData,
+                                    size: 28,
+                                    symbolAccentColor: kid.iconColor
+                                )
                                 Text(kid.name)
                                     .foregroundStyle(.primary)
                                 Spacer()
@@ -379,35 +403,18 @@ struct FamilyBulkTransactionView: View {
                             }
                         }
                         .buttonStyle(.plain)
+                        .kidsSelectionListSeparatorInsets()
                     }
+
                     if !selectedKids.isEmpty {
                         SelectedKidsOverlappingAvatars(kids: selectedKids)
                             .frame(maxWidth: .infinity)
-                            .padding(.top, 30)
-                            .padding(.bottom, 12)
-                            .padding(.horizontal, 8)
-                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 10, leading: 8, bottom: 12, trailing: 8))
+                            .kidsSelectionListSeparatorInsets()
+                            .listRowSeparator(.hidden, edges: .bottom)
                     }
                 } header: {
-                    HStack {
-                        Text(languageManager.text(.familyKidsSection))
-                            .foregroundStyle(attemptedSubmit && !isKidsValid ? .red : .primary)
-                        Spacer()
-                        Button {
-                            if allSelected {
-                                selectedKidIDs.removeAll()
-                            } else {
-                                selectedKidIDs = allKidIDs
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Text(languageManager.text(.familySelectAll))
-                                Image(systemName: allSelected ? "checkmark.square.fill" : "square")
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .textCase(nil)
-                    }
+                    Text(languageManager.text(.familySelectKids))
                 } footer: {
                     if attemptedSubmit && !isKidsValid {
                         Text(languageManager.text(.familyBulkKidsRequired))
@@ -470,6 +477,16 @@ struct SelectedKidsOverlappingAvatars: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: kids.map(\.id))
+    }
+}
+
+extension View {
+    /// Same separator width as under “Select all” (not indented past row avatars).
+    func kidsSelectionListSeparatorInsets() -> some View {
+        alignmentGuide(.listRowSeparatorLeading) { _ in 16 }
+            .alignmentGuide(.listRowSeparatorTrailing) { dimensions in
+                dimensions.width - 16
+            }
     }
 }
 
@@ -621,12 +638,32 @@ struct KidAllowanceInputRow: UIViewRepresentable {
             let showInvalid = parent.showErrorAppearance && !parent.isValid
             textField.textColor = showInvalid ? .systemRed : .label
             symbolLabel.textColor = showInvalid ? .systemRed : .secondaryLabel
-            textField.placeholder = showInvalid ? parent.placeholderError : parent.placeholderOK
+
+            if showInvalid {
+                textField.attributedPlaceholder = NSAttributedString(
+                    string: parent.placeholderError,
+                    attributes: [
+                        .foregroundColor: UIColor.systemRed,
+                        .font: font,
+                    ]
+                )
+                symbolLabel.text = ""
+                symbolLabel.isHidden = true
+            } else {
+                textField.attributedPlaceholder = NSAttributedString(
+                    string: parent.placeholderOK,
+                    attributes: [
+                        .foregroundColor: UIColor.secondaryLabel,
+                        .font: font,
+                    ]
+                )
+                symbolLabel.isHidden = false
+                symbolLabel.text = parent.symbol
+            }
 
             if textField.text != parent.text {
                 textField.text = parent.text
             }
-            symbolLabel.text = parent.symbol
 
             updateTextFieldWidth()
         }
@@ -635,9 +672,13 @@ struct KidAllowanceInputRow: UIViewRepresentable {
             guard let textField, let widthConstraint else { return }
             let font = textField.font ?? Self.boldBodyFont()
             let raw = textField.text ?? ""
+            let showInvalid = parent.showErrorAppearance && !parent.isValid
             let measure: String = {
                 if raw.isEmpty {
-                    return textField.placeholder ?? parent.placeholderOK
+                    if showInvalid {
+                        return parent.placeholderError
+                    }
+                    return parent.placeholderOK
                 }
                 return raw
             }()
