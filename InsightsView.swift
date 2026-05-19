@@ -724,16 +724,27 @@ struct InsightsView: View {
             .sorted { $0.amount > $1.amount }
     }
 
+    private func insightsKidColor(forKidId kidId: UUID) -> Color {
+        guard let index = familyStore.kids.firstIndex(where: { $0.id == kidId }) else {
+            return categoryPalette[0]
+        }
+        return categoryPalette[index % categoryPalette.count]
+    }
+
     private var kidBalanceColored: [(kidId: UUID, name: String, amount: Double, color: Color)] {
-        kidBalanceRows.enumerated().map { index, item in
-            (kidId: item.kidId, name: item.name, amount: item.amount, color: categoryPalette[index % categoryPalette.count])
+        kidBalanceRows.map { item in
+            (
+                kidId: item.kidId,
+                name: item.name,
+                amount: item.amount,
+                color: insightsKidColor(forKidId: item.kidId)
+            )
         }
     }
 
     private var goalCompletionRows: [(kidId: UUID, name: String, completionPercent: Int, goalsCount: Int, color: Color, icon: String, customImageData: Data?)] {
         familyStore.kids
-            .enumerated()
-            .map { index, kid in
+            .map { kid in
                 let goals = goalsStore.goals(for: kid.id)
                 let balance = max(0, kid.currentBalance)
                 let completion: Int = {
@@ -749,7 +760,7 @@ struct InsightsView: View {
                     name: kid.name,
                     completionPercent: completion,
                     goalsCount: goals.count,
-                    color: categoryPalette[index % categoryPalette.count],
+                    color: insightsKidColor(forKidId: kid.id),
                     icon: kid.icon,
                     customImageData: kid.customImageData
                 )

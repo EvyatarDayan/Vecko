@@ -10,6 +10,7 @@ import UIKit
 
 @MainActor
 struct HomeView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var currencyManager: CurrencyManager
     @EnvironmentObject var familyStore: FamilyStore
     @EnvironmentObject var languageManager: LanguageManager
@@ -382,18 +383,26 @@ struct HomeView: View {
         }
     }
 
+    private var homeTransactionButtonForeground: Color {
+        guard !kids.isEmpty else { return .secondary }
+        return colorScheme == .dark ? .white : .primary
+    }
+
     private var homeTransactionButtons: some View {
         HStack(spacing: 12) {
             Button {
                 activeTransactionType = .deposit
             } label: {
                 HStack(spacing: 6) {
-                    Text("⬇️")
-                        .font(.system(size: 13))
+                    Image("Deposit")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 25, height: 25)
                     Text(languageManager.text(.familyDeposit))
                         .font(.headline)
                 }
-                .foregroundColor(kids.isEmpty ? .secondary : .appGreen)
+                .foregroundStyle(homeTransactionButtonForeground)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .background(
@@ -412,12 +421,15 @@ struct HomeView: View {
                 activeTransactionType = .withdraw
             } label: {
                 HStack(spacing: 6) {
-                    Text("⬆️")
-                        .font(.system(size: 13))
+                    Image("Withdraw")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 25, height: 25)
                     Text(languageManager.text(.familyWithdraw))
                         .font(.headline)
                 }
-                .foregroundColor(kids.isEmpty ? .secondary : .orange)
+                .foregroundStyle(homeTransactionButtonForeground)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .background(

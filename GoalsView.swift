@@ -261,7 +261,7 @@ struct GoalsView: View {
         }
         .veckoToolbarActionStyle()
         .padding(.top, 6)
-        .padding(.trailing, 16)
+        .padding(.trailing, 20)
         .disabled(kids.isEmpty)
     }
 
@@ -277,19 +277,8 @@ struct GoalsView: View {
     }
 
     private func editGoalSheet(goal: KidGoal) -> some View {
-        AddGoalView(mode: .edit(goal), onSave: { saved in
-            if goalsStore.goals.contains(where: { $0.id == saved.id }) {
-                goalsStore.updateGoal(saved)
-            } else {
-                goalsStore.addGoal(saved)
-                let kidName = familyStore.kids.first(where: { $0.id == saved.kidId })?.name ?? languageManager.text(.unknownKid)
-                historyStore.recordGoalAdded(
-                    kidId: saved.kidId,
-                    kidName: kidName,
-                    goalTitle: saved.title,
-                    targetAmount: saved.targetAmount
-                )
-            }
+        AddGoalView(mode: .edit(goal), onSave: { updated in
+            goalsStore.updateGoal(updated)
         }, onDelete: {
             goalsStore.removeGoal(id: goal.id)
         })
@@ -980,6 +969,11 @@ private struct AddGoalView: View {
         isTitleValid && isAmountValid && isKidValid && isVisualValid
     }
 
+    private var isKidSelectionLocked: Bool {
+        if case .edit = mode { return true }
+        return false
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -1105,6 +1099,8 @@ private struct AddGoalView: View {
                             .foregroundStyle(.red)
                     }
                 }
+                .disabled(isKidSelectionLocked)
+                .opacity(isKidSelectionLocked ? 0.55 : 1)
 
                 if case .edit = mode, onDelete != nil {
                     Section {
@@ -1165,22 +1161,16 @@ private struct AddGoalView: View {
                 onSave(goal)
             }
         case .edit(let existing):
-            if !selectedKidIDs.contains(existing.kidId) {
-                onDelete?()
-            }
-            for kidId in selectedKidIDs {
-                let isExistingKid = kidId == existing.kidId
-                let goal = KidGoal(
-                    id: isExistingKid ? existing.id : UUID(),
-                    kidId: kidId,
-                    title: trimmedTitle,
-                    targetAmount: amount,
-                    imageData: imageData,
-                    iconSystemName: selectedIcon,
-                    createdAt: isExistingKid ? existing.createdAt : Date()
-                )
-                onSave(goal)
-            }
+            let goal = KidGoal(
+                id: existing.id,
+                kidId: existing.kidId,
+                title: trimmedTitle,
+                targetAmount: amount,
+                imageData: imageData,
+                iconSystemName: selectedIcon,
+                createdAt: existing.createdAt
+            )
+            onSave(goal)
         }
         dismiss()
     }
