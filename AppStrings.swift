@@ -42,7 +42,9 @@ enum AppStringKey {
     case familySelectKids
     case familySelectAll
     case familyBulkAmount, familyBulkNote
+    case familyBulkNotePlaceholderDeposit, familyBulkNotePlaceholderWithdraw
     case familyBulkAmountRequired, familyBulkNoteRequired, familyBulkKidsRequired
+    case familyBulkNoteRequiredDeposit, familyBulkNoteRequiredWithdraw
     case familyBulkAdd, familyBulkWithdrawAction
 
     // Add / edit kid
@@ -172,6 +174,8 @@ enum AppStringKey {
     case settingsTermsTitle, settingsTermsSubtitle
     case settingsAboutTitle, settingsAboutSubtitle
     case settingsExportTitle, settingsExportSubtitle
+    case settingsClearHistoryTitle, settingsClearHistorySubtitle
+    case settingsClearHistoryAlertTitle, settingsClearHistoryAlertMessage
     case settingsClearTitle, settingsClearSubtitle
     case settingsExportAlertTitle, settingsExportAlertMessage
     case settingsClearAlertTitle, settingsClearAlertMessage
@@ -206,7 +210,12 @@ enum AppStringKey {
 
     // History titles (canonical English stored; used for mapping + new rows)
     case historyKidAdded, historyKidRemoved, historyKidUpdated, historyGoalAdded
-    case historyAllowancePaid, historyInterestCredited, historyDeposit, historyWithdrawal
+    case historyAllowancePaid, historyWeeklyAllowancePaidDetailTitle
+    case historyInterestCredited, historyInterestCreditedDetailFormat
+    case historyDeposit, historyWithdrawal, historyKidBirthday
+    case historyKidUpdateNameFormat, historyKidUpdateAllowanceFormat, historyKidUpdateInterestFormat
+    case historyKidUpdatePayDayFormat, historyKidUpdateDepositTimeFormat, historyKidUpdateBirthdayFormat
+    case historyKidUpdatePhotoFormat
 }
 
 enum AppStringCatalog {
@@ -257,14 +266,18 @@ enum AppStringCatalog {
         case .familySelectAll: return t(language, en: "Select all", sv: "Välj alla", es: "Seleccionar todo", fr: "Tout sélectionner", de: "Alle auswählen")
         case .familyBulkAmount: return t(language, en: "Amount", sv: "Belopp", es: "Importe", fr: "Montant", de: "Betrag")
         case .familyBulkNote: return t(language, en: "Note", sv: "Anteckning", es: "Nota", fr: "Note", de: "Notiz")
+        case .familyBulkNotePlaceholderDeposit: return t(language, en: "Reason for deposit", sv: "Anledning till insättning", es: "Motivo del ingreso", fr: "Motif du dépôt", de: "Grund für die Einzahlung")
+        case .familyBulkNotePlaceholderWithdraw: return t(language, en: "Reason for Withdraw", sv: "Anledning till uttag", es: "Motivo del retiro", fr: "Motif du retrait", de: "Grund für die Abhebung")
         case .familyBulkAmountRequired: return t(language, en: "Amount is required", sv: "Belopp krävs", es: "El importe es obligatorio", fr: "Le montant est requis", de: "Betrag ist erforderlich")
         case .familyBulkNoteRequired: return t(language, en: "Note is required", sv: "Anteckning krävs", es: "La nota es obligatoria", fr: "La note est requise", de: "Notiz ist erforderlich")
+        case .familyBulkNoteRequiredDeposit: return t(language, en: "Reason for deposit is required", sv: "Anledning till insättning krävs", es: "El motivo del ingreso es obligatorio", fr: "Le motif du dépôt est requis", de: "Grund für die Einzahlung ist erforderlich")
+        case .familyBulkNoteRequiredWithdraw: return t(language, en: "Reason for Withdraw is required", sv: "Anledning till uttag krävs", es: "El motivo del retiro es obligatorio", fr: "Le motif du retrait est requis", de: "Grund für die Abhebung ist erforderlich")
         case .familyBulkKidsRequired: return t(language, en: "Select at least one kid", sv: "Välj minst ett barn", es: "Selecciona al menos un niño", fr: "Sélectionnez au moins un enfant", de: "Mindestens ein Kind auswählen")
         case .familyBulkAdd: return t(language, en: "Deposit", sv: "Sätt in", es: "Ingresar", fr: "Dépôt", de: "Einzahlen")
         case .familyBulkWithdrawAction: return t(language, en: "Withdraw", sv: "Ta ut", es: "Retirar", fr: "Retirer", de: "Abheben")
 
         case .kidSectionDetails: return t(language, en: "Kid details", sv: "Barnuppgifter", es: "Datos del niño", fr: "Détails de l’enfant", de: "Kinddetails")
-        case .kidSectionAllowance: return t(language, en: "Allowance", sv: "Veckopeng", es: "Paga", fr: "Argent de poche", de: "Taschengeld")
+        case .kidSectionAllowance: return t(language, en: "Weekly allowance", sv: "Veckopeng", es: "Paga semanal", fr: "Allocation hebdomadaire", de: "Wöchentliches Taschengeld")
         case .kidSectionSchedule: return t(language, en: "Pay day", sv: "Utbetalningsdag", es: "Día de pago", fr: "Jour de paie", de: "Zahltag")
         case .kidBirthday: return t(language, en: "Birthday", sv: "Födelsedag", es: "Cumpleaños", fr: "Date de naissance", de: "Geburtsdatum")
         case .kidBirthdayToday: return t(language, en: "Happy Birthday!!! 🎁", sv: "Grattis på födelsedagen!!! 🎁", es: "¡Feliz cumpleaños!!! 🎁", fr: "Joyeux anniversaire !!! 🎁", de: "Herzlichen Glückwunsch zum Geburtstag!!! 🎁")
@@ -274,7 +287,7 @@ enum AppStringCatalog {
         case .kidWeeklyAllowanceRequired: return t(language, en: "Weekly allowance is required", sv: "Veckopeng krävs", es: "La paga semanal es obligatoria", fr: "L’allocation hebdomadaire est requise", de: "Wöchentliches Taschengeld ist erforderlich")
         case .kidDepositFrequency: return t(language, en: "Deposit frequency", sv: "Insättningsfrekvens", es: "Frecuencia de ingreso", fr: "Fréquence du versement", de: "Auszahlungsrhythmus")
         case .kidDepositTime: return t(language, en: "Deposit time", sv: "Insättningstid", es: "Hora del ingreso", fr: "Heure du versement", de: "Auszahlungszeit")
-        case .kidMonthlyInterestHeader: return t(language, en: "Monthly interest", sv: "Månadsränta", es: "Interés mensual", fr: "Intérêts mensuels", de: "Monatszins")
+        case .kidMonthlyInterestHeader: return t(language, en: "Monthly interest from balance", sv: "Månadsränta på saldo", es: "Interés mensual sobre el saldo", fr: "Intérêts mensuels sur le solde", de: "Monatszins auf Guthaben")
         case .kidSelectIcon: return t(language, en: "Select", sv: "Välj", es: "Elegir", fr: "Choisir", de: "Auswählen")
         case .kidProfileTapPhoto: return t(language, en: "Tap photo to change", sv: "Tryck på bilden för att byta", es: "Toca la foto para cambiar", fr: "Touchez la photo pour changer", de: "Tippe auf das Foto zum Ändern")
         case .kidDelete: return t(language, en: "Delete Kid", sv: "Ta bort barn", es: "Eliminar niño", fr: "Supprimer l’enfant", de: "Kind löschen")
@@ -332,7 +345,7 @@ enum AppStringCatalog {
         case .goalsSelectKid: return t(language, en: "Select kids", sv: "Välj barn", es: "Seleccionar niños", fr: "Sélectionner des enfants", de: "Kinder auswählen")
         case .goalsKidRequired: return t(language, en: "Select at least one kid", sv: "Välj minst ett barn", es: "Selecciona al menos un niño", fr: "Sélectionnez au moins un enfant", de: "Mindestens ein Kind auswählen")
         case .goalsPickerKid: return t(language, en: "Kid", sv: "Barn", es: "Niño", fr: "Enfant", de: "Kind")
-        case .goalsGoalTitlePlaceholder: return t(language, en: "Goal title", sv: "Måltitel", es: "Título de la meta", fr: "Titre de l’objectif", de: "Zieltitel")
+        case .goalsGoalTitlePlaceholder: return t(language, en: "Ex: New laptop", sv: "Ex: Ny laptop", es: "Ej.: Portátil nuevo", fr: "Ex. : Nouvel ordinateur", de: "z. B. Neuer Laptop")
         case .goalsGoalTitleRequired: return t(language, en: "Goal title is required", sv: "Måltitel krävs", es: "El título es obligatorio", fr: "Le titre est requis", de: "Titel ist erforderlich")
         case .goalsTargetPlaceholder: return t(language, en: "Target amount", sv: "Målbelopp", es: "Importe objetivo", fr: "Montant cible", de: "Zielbetrag")
         case .goalsTargetRequired: return t(language, en: "Cost is required", sv: "Kostnad krävs", es: "El coste es obligatorio", fr: "Le coût est requis", de: "Kosten erforderlich")
@@ -431,6 +444,10 @@ enum AppStringCatalog {
         case .settingsAboutSubtitle: return t(language, en: "App info", sv: "Appinfo", es: "Info de la app", fr: "Infos sur l’app", de: "App‑Infos")
         case .settingsExportTitle: return t(language, en: "Export data", sv: "Exportera data", es: "Exportar datos", fr: "Exporter les données", de: "Daten exportieren")
         case .settingsExportSubtitle: return t(language, en: "Export to a PDF file", sv: "Exportera till en PDF-fil", es: "Exportar a un archivo PDF", fr: "Exporter vers un fichier PDF", de: "In eine PDF-Datei exportieren")
+        case .settingsClearHistoryTitle: return t(language, en: "Clear history", sv: "Rensa historik", es: "Borrar historial", fr: "Effacer l’historique", de: "Verlauf löschen")
+        case .settingsClearHistorySubtitle: return t(language, en: "Remove all history entries", sv: "Ta bort alla historikposter", es: "Eliminar todas las entradas del historial", fr: "Supprimer toutes les entrées d’historique", de: "Alle Verlaufseinträge entfernen")
+        case .settingsClearHistoryAlertTitle: return t(language, en: "Clear history?", sv: "Rensa historik?", es: "¿Borrar historial?", fr: "Effacer l’historique ?", de: "Verlauf löschen?")
+        case .settingsClearHistoryAlertMessage: return t(language, en: "All history entries will be permanently deleted. Kids, goals, and transactions are not affected.", sv: "All historik tas bort permanent. Barn, mål och transaktioner påverkas inte.", es: "Se borrará todo el historial de forma permanente. Los niños, metas y transacciones no se verán afectados.", fr: "Tout l’historique sera définitivement supprimé. Les enfants, objectifs et transactions ne sont pas concernés.", de: "Der gesamte Verlauf wird dauerhaft gelöscht. Kinder, Ziele und Transaktionen bleiben unverändert.")
         case .settingsClearTitle: return t(language, en: "Clear all data", sv: "Rensa all data", es: "Borrar todos los datos", fr: "Effacer toutes les données", de: "Alle Daten löschen")
         case .settingsClearSubtitle: return t(language, en: "Delete all app data", sv: "Ta bort all appdata", es: "Eliminar todos los datos de la app", fr: "Supprimer toutes les données de l’app", de: "Alle App-Daten löschen")
         case .settingsExportAlertTitle: return t(language, en: "Export data", sv: "Exportera data", es: "Exportar datos", fr: "Exporter les données", de: "Daten exportieren")
@@ -488,11 +505,21 @@ enum AppStringCatalog {
         case .historyKidAdded: return t(language, en: "Kid added", sv: "Barn tillagt", es: "Niño añadido", fr: "Enfant ajouté", de: "Kind hinzugefügt")
         case .historyKidRemoved: return t(language, en: "Kid removed", sv: "Barn borttaget", es: "Niño eliminado", fr: "Enfant supprimé", de: "Kind entfernt")
         case .historyKidUpdated: return t(language, en: "Kid updated", sv: "Barn uppdaterat", es: "Niño actualizado", fr: "Enfant mis à jour", de: "Kind aktualisiert")
-        case .historyGoalAdded: return t(language, en: "Goal added", sv: "Mål tillagt", es: "Meta añadida", fr: "Objectif ajouté", de: "Ziel hinzugefügt")
+        case .historyGoalAdded: return t(language, en: "New goal", sv: "Nytt mål", es: "Nueva meta", fr: "Nouvel objectif", de: "Neues Ziel")
         case .historyAllowancePaid: return t(language, en: "Allowance paid", sv: "Veckopeng utbetald", es: "Paga abonada", fr: "Allocation versée", de: "Taschengeld gutgeschrieben")
+        case .historyWeeklyAllowancePaidDetailTitle: return t(language, en: "Weekly allowance paid", sv: "Veckopeng utbetald", es: "Paga semanal abonada", fr: "Allocation hebdomadaire versée", de: "Wöchentliches Taschengeld gutgeschrieben")
         case .historyInterestCredited: return t(language, en: "Interest credited", sv: "Ränta tillagd", es: "Interés abonado", fr: "Intérêts crédités", de: "Zins gutgeschrieben")
+        case .historyInterestCreditedDetailFormat: return t(language, en: "%d%% interest paid - %@", sv: "%d%% ränta utbetald - %@", es: "%d%% interés pagado - %@", fr: "%d%% intérêts versés - %@", de: "%d%% Zins ausgezahlt - %@")
         case .historyDeposit: return t(language, en: "Deposit", sv: "Insättning", es: "Ingreso", fr: "Dépôt", de: "Einzahlung")
         case .historyWithdrawal: return t(language, en: "Withdrawal", sv: "Uttag", es: "Retiro", fr: "Retrait", de: "Auszahlung")
+        case .historyKidBirthday: return t(language, en: "Birthday", sv: "Födelsedag", es: "Cumpleaños", fr: "Anniversaire", de: "Geburtstag")
+        case .historyKidUpdateNameFormat: return t(language, en: "Name updated to %@", sv: "Namn uppdaterat till %@", es: "Nombre actualizado a %@", fr: "Nom mis à jour : %@", de: "Name aktualisiert zu %@")
+        case .historyKidUpdateAllowanceFormat: return t(language, en: "Weekly allowance updated to %@", sv: "Veckopeng uppdaterad till %@", es: "Paga semanal actualizada a %@", fr: "Allocation hebdomadaire mise à jour : %@", de: "Wöchentliches Taschengeld aktualisiert auf %@")
+        case .historyKidUpdateInterestFormat: return t(language, en: "Interest updated to %d%%", sv: "Ränta uppdaterad till %d%%", es: "Interés actualizado a %d%%", fr: "Intérêts mis à jour : %d%%", de: "Zins aktualisiert auf %d%%")
+        case .historyKidUpdatePayDayFormat: return t(language, en: "Pay day updated to %@", sv: "Utbetalningsdag uppdaterad till %@", es: "Día de pago actualizado a %@", fr: "Jour de paie mis à jour : %@", de: "Zahltag aktualisiert auf %@")
+        case .historyKidUpdateDepositTimeFormat: return t(language, en: "Deposit time updated to %@", sv: "Insättningstid uppdaterad till %@", es: "Hora de ingreso actualizada a %@", fr: "Heure de dépôt mise à jour : %@", de: "Einzahlungszeit aktualisiert auf %@")
+        case .historyKidUpdateBirthdayFormat: return t(language, en: "Birthday updated to %@", sv: "Födelsedag uppdaterad till %@", es: "Cumpleaños actualizado a %@", fr: "Date de naissance mise à jour : %@", de: "Geburtsdatum aktualisiert auf %@")
+        case .historyKidUpdatePhotoFormat: return t(language, en: "Profile photo updated", sv: "Profilbild uppdaterad", es: "Foto de perfil actualizada", fr: "Photo de profil mise à jour", de: "Profilfoto aktualisiert")
         }
     }
 
@@ -501,19 +528,99 @@ enum AppStringCatalog {
         case "Kid added": return string(.historyKidAdded, language: language)
         case "Kid removed": return string(.historyKidRemoved, language: language)
         case "Kid updated": return string(.historyKidUpdated, language: language)
-        case "Goal added": return string(.historyGoalAdded, language: language)
-        case "Allowance paid": return string(.historyAllowancePaid, language: language)
+        case "Goal added", "New goal": return string(.historyGoalAdded, language: language)
+        case "Allowance paid", "Weekly allowance paid": return string(.historyAllowancePaid, language: language)
         case "Interest credited": return string(.historyInterestCredited, language: language)
         case "Deposit": return string(.historyDeposit, language: language)
         case "Withdrawal": return string(.historyWithdrawal, language: language)
+        case "Birthday": return string(.historyKidBirthday, language: language)
         default: return storedTitle
         }
+    }
+
+    /// Title shown in the history detail popup (may differ from the list row title).
+    static func localizedHistoryDetailTitle(storedTitle: String, language: AppLanguage) -> String {
+        switch storedTitle {
+        case "Allowance paid", "Weekly allowance paid":
+            return string(.historyWeeklyAllowancePaidDetailTitle, language: language)
+        case "Birthday":
+            return string(.kidBirthdayToday, language: language)
+        default:
+            return localizedHistoryTitle(storedTitle: storedTitle, language: language)
+        }
+    }
+
+    /// Subtitle/detail line for history list rows and the birthday popup body.
+    static func localizedKidBirthdayHistoryDetail(kidName: String, language: AppLanguage) -> String {
+        String(
+            format: string(.insightsFactBirthdayToday, language: language),
+            locale: language.locale,
+            arguments: [kidName]
+        )
     }
 
     static func displayDepositFrequency(_ frequency: DepositFrequency, language: AppLanguage) -> String {
         switch frequency {
         case .weekly: return string(.frequencyWeekly, language: language)
         case .monthly: return string(.frequencyMonthly, language: language)
+        }
+    }
+
+    /// `weekday` is `Calendar` weekday (1 = Sunday … 7 = Saturday).
+    /// e.g. `2% interest paid - 34.80 SEK` (popup); parses legacy `1% · +34.80` rows too.
+    static func localizedInterestCreditedDetail(storedDetail: String, language: AppLanguage) -> String {
+        guard let parsed = parseInterestCreditedDetail(storedDetail) else { return storedDetail }
+        let amountText = displayAmountTextForInterestDetail(parsed.amountText)
+        return String(
+            format: string(.historyInterestCreditedDetailFormat, language: language),
+            locale: language.locale,
+            arguments: [parsed.percent, amountText]
+        )
+    }
+
+    private static func parseInterestCreditedDetail(_ storedDetail: String) -> (percent: Int, amountText: String)? {
+        let trimmed = storedDetail.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let marker = trimmed.range(of: "% interest paid - ") {
+            let percentPart = String(trimmed[..<marker.lowerBound]).trimmingCharacters(in: .whitespaces)
+            let amountPart = String(trimmed[marker.upperBound...]).trimmingCharacters(in: .whitespaces)
+            guard let percent = Int(percentPart), !amountPart.isEmpty else { return nil }
+            return (percent, amountPart)
+        }
+        if let separator = trimmed.range(of: " · ") {
+            let left = String(trimmed[..<separator.lowerBound]).trimmingCharacters(in: .whitespaces)
+            var right = String(trimmed[separator.upperBound...]).trimmingCharacters(in: .whitespaces)
+            if right.hasPrefix("+") {
+                right = String(right.dropFirst()).trimmingCharacters(in: .whitespaces)
+            }
+            guard left.hasSuffix("%"), let percent = Int(String(left.dropLast()).trimmingCharacters(in: .whitespaces)),
+                  !right.isEmpty else { return nil }
+            return (percent, right)
+        }
+        return nil
+    }
+
+    private static func displayAmountTextForInterestDetail(_ raw: String) -> String {
+        let cleaned = raw
+            .replacingOccurrences(of: "+", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let numericPart = cleaned.split(separator: " ").first.map(String.init) ?? cleaned
+        let normalized = numericPart.replacingOccurrences(of: ",", with: "")
+        if let value = Double(normalized) {
+            return CurrencyManager().formatAmount(value)
+        }
+        return raw
+    }
+
+    static func weekdayName(_ weekday: Int, language: AppLanguage) -> String {
+        switch weekday {
+        case 1: return string(.weekdaySun, language: language)
+        case 2: return string(.weekdayMon, language: language)
+        case 3: return string(.weekdayTue, language: language)
+        case 4: return string(.weekdayWed, language: language)
+        case 5: return string(.weekdayThu, language: language)
+        case 6: return string(.weekdayFri, language: language)
+        case 7: return string(.weekdaySat, language: language)
+        default: return string(.weekdayMon, language: language)
         }
     }
 

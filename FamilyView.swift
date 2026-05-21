@@ -150,7 +150,7 @@ final class FamilyStore: ObservableObject {
                 isInterest: false,
                 date: now
             )
-            historyStore.recordScheduledAllowancePaid(kidId: kid.id, kidName: kid.name, amount: amount, scheduleLabel: scheduleLabel)
+            historyStore.recordScheduledAllowancePaid(kidId: kid.id, kidName: kid.name, amount: amount)
 
             newKids[index] = kid
             didChange = true
@@ -210,6 +210,34 @@ final class FamilyStore: ObservableObject {
         if didChange {
             kids = newKids
         }
+    }
+
+    /// Records a birthday history entry once per kid per calendar year when today matches their birthday.
+    func processBirthdayHistoryIfNeeded(historyStore: HistoryStore) {
+        let calendar = Calendar.current
+        let now = Date()
+        let yearKey = Self.calendarYearKey(for: now)
+        var newKids = kids
+        var didChange = false
+
+        for index in newKids.indices {
+            var kid = newKids[index]
+            guard kid.isBirthday(on: now, calendar: calendar) else { continue }
+            guard kid.lastBirthdayHistoryYearKey != yearKey else { continue }
+
+            historyStore.recordKidBirthday(kidId: kid.id, kidName: kid.name)
+            kid.lastBirthdayHistoryYearKey = yearKey
+            newKids[index] = kid
+            didChange = true
+        }
+
+        if didChange {
+            kids = newKids
+        }
+    }
+
+    private static func calendarYearKey(for date: Date) -> String {
+        String(format: "%04d", Calendar.current.component(.year, from: date))
     }
 
     private static func isPastOrAtDepositTime(depositTime: Date, now: Date, calendar: Calendar) -> Bool {
@@ -328,7 +356,7 @@ struct FamilyBulkTransactionView: View {
                 Form {
                 Section(languageManager.text(.familyBulkAmount)) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        RoundedRectangle(cornerRadius: 15, style: .continuous)
                             .fill((type.isDeposit ? Color.appGreen : Color.appRed).opacity(colorScheme == .dark ? 0.2 : 0.14))
                         KidAllowanceInputRow(
                             text: $amount,
@@ -348,17 +376,24 @@ struct FamilyBulkTransactionView: View {
                 }
 
                 Section(languageManager.text(.familyBulkNote)) {
-                    TextField(
-                        "",
-                        text: $note,
-                        prompt: Text(
-                            attemptedSubmit && !isNoteValid
-                            ? languageManager.text(.familyBulkNoteRequired)
-                            : languageManager.text(.familyBulkNote)
-                        ).foregroundColor(attemptedSubmit && !isNoteValid ? .red : .secondary)
-                    )
-                        .autocorrectionDisabled(true)
-                        .textInputAutocapitalization(.never)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 15, style: .continuous)
+                            .fill((type.isDeposit ? Color.appGreen : Color.appRed).opacity(colorScheme == .dark ? 0.2 : 0.14))
+                        KidCenteredTextInputRow(
+                            text: $note,
+                            isValid: isNoteValid,
+                            showErrorAppearance: attemptedSubmit,
+                            placeholderOK: languageManager.text(
+                                type.isDeposit ? .familyBulkNotePlaceholderDeposit : .familyBulkNotePlaceholderWithdraw
+                            ),
+                            placeholderError: languageManager.text(
+                                type.isDeposit ? .familyBulkNoteRequiredDeposit : .familyBulkNoteRequiredWithdraw
+                            )
+                        )
+                        .frame(minHeight: 48)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
                 }
 
                 Section {
@@ -1014,6 +1049,7 @@ struct AddEditKidView: View {
 
     /// Matches the green allowance amount inner frame.
     private static let contentCornerRadius: CGFloat = 10
+    private static let weekdayCheckboxIconFont: Font = .callout.weight(.semibold)
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -1029,6 +1065,7 @@ struct AddEditKidView: View {
     @State private var currentBalance = "0.00"
     @State private var selectedIcon = KidAvatarCatalog.pickerAssetNames.first ?? "person.fill"
     @State private var selectedImage: UIImage?
+    @State private var profileImageWasModified = false
     @State private var showingIconPicker = false
     /// `nil` until the user picks a date (or an existing kid birthday is loaded).
     @State private var birthday: Date?
@@ -1102,26 +1139,8 @@ struct AddEditKidView: View {
         return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     }
 
-    private var kidProfileSubtitle: String {
-        let freq = AppStringCatalog.displayDepositFrequency(.weekly, language: languageManager.language)
-        if let val = Double(weeklyAllowance), val > 0 {
-            return String(
-                format: languageManager.text(.allowanceLineFormat),
-                locale: languageManager.locale,
-                arguments: [freq, currencyManager.formatAmount(val)]
-            )
-        }
-        return freq
-    }
-
     private var profileHeroCardFill: Color {
         colorScheme == .dark ? Color(.systemGray6) : Color(.systemBackground)
-    }
-
-    private var profileSubtitleColor: Color {
-        colorScheme == .dark
-            ? Color(red: 0.58, green: 0.76, blue: 0.98)
-            : Color(red: 0.34, green: 0.54, blue: 0.86)
     }
 
     private var profileAvatarSymbolColor: Color {
@@ -1129,6 +1148,12 @@ struct AddEditKidView: View {
             ? Color(red: 0.55, green: 0.72, blue: 0.96)
             : Color(red: 0.35, green: 0.55, blue: 0.9)
     }
+
+    private var profileNameFieldBackground: Color {
+        Color.blue.opacity(colorScheme == .dark ? 0.14 : 0.09)
+    }
+
+    private static let profileFieldCornerRadius: CGFloat = 12
 
     @ViewBuilder
     private var kidDetailsHeroSection: some View {
@@ -1191,57 +1216,61 @@ struct AddEditKidView: View {
                 Spacer()
                     .frame(height: max(0, avatarSize - avatarCardOverlap + 8))
 
-                TextField(
-                    "",
-                    text: $name,
-                    prompt: Text(isNameValid || !attemptedSave ? languageManager.text(.kidNamePlaceholder) : languageManager.text(.kidNameRequired))
-                        .foregroundColor(isNameValid || !attemptedSave ? .secondary : .red)
-                )
-                .multilineTextAlignment(.center)
-                .font(.title2.weight(.bold))
-                .foregroundStyle(.primary)
-                .autocorrectionDisabled(true)
-                .textInputAutocapitalization(.never)
-                .padding(.top, 25)
+                VStack(alignment: .leading, spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(
+                            cornerRadius: Self.profileFieldCornerRadius,
+                            style: .continuous
+                        )
+                        .fill(profileNameFieldBackground)
 
-                Text(kidProfileSubtitle)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(profileSubtitleColor)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 6)
-
-                Divider()
-                    .padding(.top, 14)
-                    .padding(.bottom, 12)
-
-                HStack(alignment: .center, spacing: 8) {
-                    Text(languageManager.text(.kidBirthday))
+                        TextField(
+                            "",
+                            text: $name,
+                            prompt: Text(
+                                isNameValid || !attemptedSave
+                                ? languageManager.text(.kidNamePlaceholder)
+                                : languageManager.text(.kidNameRequired)
+                            )
+                            .foregroundColor(isNameValid || !attemptedSave ? .secondary : .red)
+                        )
+                        .multilineTextAlignment(.center)
+                        .font(.title.weight(.bold))
                         .foregroundStyle(.primary)
-                        .layoutPriority(1)
-                    Spacer(minLength: 0)
-                    DatePicker(
-                        "",
-                        selection: $birthdayPickerDate,
-                        displayedComponents: [.date]
-                    )
-                    .onChange(of: birthdayPickerDate) { _, newValue in
-                        syncBirthdayFromPicker(newValue)
+                        .autocorrectionDisabled(true)
+                        .textInputAutocapitalization(.never)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 14)
                     }
-                    .labelsHidden()
-                    .datePickerStyle(.compact)
-                    .environment(\.locale, languageManager.locale)
-                    .fixedSize()
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+                    .frame(minHeight: 56)
 
-                Spacer()
-                    .frame(height: 16)
+                    HStack(alignment: .center, spacing: 8) {
+                        Text(languageManager.text(.kidBirthday))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 8)
+                        DatePicker(
+                            "",
+                            selection: $birthdayPickerDate,
+                            displayedComponents: [.date]
+                        )
+                        .onChange(of: birthdayPickerDate) { _, newValue in
+                            syncBirthdayFromPicker(newValue)
+                        }
+                        .labelsHidden()
+                        .datePickerStyle(.compact)
+                        .environment(\.locale, languageManager.locale)
+                        .fixedSize()
+                    }
+                    .padding(.horizontal, 4)
+                }
+                .padding(.top, 36)
+                .padding(.bottom, 16)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 16)
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                RoundedRectangle(cornerRadius: 15, style: .continuous)
                     .fill(profileHeroCardFill)
             )
             .zIndex(0)
@@ -1312,7 +1341,7 @@ struct AddEditKidView: View {
                                         .lineLimit(1)
                                         .foregroundStyle(isSelected ? Color.primary : Color.secondary)
                                     Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                                        .font(.caption2.weight(.semibold))
+                                        .font(Self.weekdayCheckboxIconFont)
                                         .foregroundStyle(isSelected ? Color.gray : Color.gray)
                                 }
                                 .frame(maxWidth: .infinity)
@@ -1364,8 +1393,12 @@ struct AddEditKidView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingIconPicker) {
-                KidIconPickerView(selectedIcon: $selectedIcon, selectedImage: $selectedImage)
-                    .environmentObject(languageManager)
+                KidIconPickerView(
+                    selectedIcon: $selectedIcon,
+                    selectedImage: $selectedImage,
+                    profileImageWasModified: $profileImageWasModified
+                )
+                .environmentObject(languageManager)
             }
             .popover(isPresented: $showingDepositTimePicker) {
                 VStack {
@@ -1397,6 +1430,7 @@ struct AddEditKidView: View {
                 applyBirthdayFromKid(nil)
                 depositTime = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
             case .edit(let kid):
+                profileImageWasModified = false
                 name = kid.name
                 applyBirthdayFromKid(kid.birthday)
                 weeklyAllowance = String(format: "%.2f", kid.weeklyAllowance)
@@ -1428,6 +1462,13 @@ struct AddEditKidView: View {
         return value > 0
     }
 
+    private func savedCustomImageData() -> Data? {
+        if case .edit(let existing) = mode, !profileImageWasModified {
+            return existing.customImageData
+        }
+        return selectedImage?.jpegData(compressionQuality: 0.8)
+    }
+
     private func saveKid() {
         attemptedSave = true
         guard isNameValid, isWeeklyAllowanceValid else { return }
@@ -1451,7 +1492,7 @@ struct AddEditKidView: View {
             weeklyAllowance: weeklyValue,
             currentBalance: balanceValue,
             icon: selectedIcon,
-            customImageData: selectedImage?.jpegData(compressionQuality: 0.8),
+            customImageData: savedCustomImageData(),
             depositFrequency: .weekly,
             depositWeekday: selectedWeekday,
             depositMonthlyDay: 1,
@@ -1466,6 +1507,12 @@ struct AddEditKidView: View {
             lastScheduledAllowancePaymentAt: {
                 if case .edit(let existing) = mode {
                     return existing.lastScheduledAllowancePaymentAt
+                }
+                return nil
+            }(),
+            lastBirthdayHistoryYearKey: {
+                if case .edit(let existing) = mode {
+                    return existing.lastBirthdayHistoryYearKey
                 }
                 return nil
             }()
@@ -1495,6 +1542,7 @@ private struct KidIconPickerView: View {
     @EnvironmentObject var languageManager: LanguageManager
     @Binding var selectedIcon: String
     @Binding var selectedImage: UIImage?
+    @Binding var profileImageWasModified: Bool
     @State private var selectedTab = 1
     @State private var showingImagePicker = false
 
@@ -1522,6 +1570,7 @@ private struct KidIconPickerView: View {
                                 Button {
                                     selectedIcon = assetName
                                     selectedImage = nil
+                                    profileImageWasModified = true
                                     dismiss()
                                 } label: {
                                     ZStack {
@@ -1573,7 +1622,9 @@ private struct KidIconPickerView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingImagePicker) {
-                ImagePicker(selectedImage: $selectedImage)
+                ImagePicker(selectedImage: $selectedImage) {
+                    profileImageWasModified = true
+                }
             }
         }
     }
@@ -1617,6 +1668,8 @@ struct FamilyKid: Identifiable {
     var lastInterestAppliedMonthKey: String?
     /// Last time scheduled allowance was auto-credited (prevents duplicate same day/week/month).
     var lastScheduledAllowancePaymentAt: Date?
+    /// `yyyy` of the last calendar year for which a birthday history entry was recorded.
+    var lastBirthdayHistoryYearKey: String?
 
     var iconColor: Color {
         switch icon {
@@ -1641,9 +1694,9 @@ struct FamilyKid: Identifiable {
     }
 
     static let sample: [FamilyKid] = [
-        FamilyKid(id: UUID(), name: "Noa", birthday: Calendar.current.date(from: DateComponents(year: 2016, month: 3, day: 12)), weeklyAllowance: 25, currentBalance: 81, icon: "star.fill", customImageData: nil, depositFrequency: .weekly, depositWeekday: 2, depositMonthlyDay: 1, depositTime: Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date(), monthlyInterestPercent: 1, lastInterestAppliedMonthKey: nil, lastScheduledAllowancePaymentAt: nil),
-        FamilyKid(id: UUID(), name: "Liam", birthday: Calendar.current.date(from: DateComponents(year: 2014, month: 7, day: 22)), weeklyAllowance: 20, currentBalance: 43, icon: "gamecontroller.fill", customImageData: nil, depositFrequency: .monthly, depositWeekday: 3, depositMonthlyDay: 10, depositTime: Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date(), monthlyInterestPercent: 2, lastInterestAppliedMonthKey: nil, lastScheduledAllowancePaymentAt: nil),
-        FamilyKid(id: UUID(), name: "Maya", birthday: nil, weeklyAllowance: 15, currentBalance: 29, icon: "book.fill", customImageData: nil, depositFrequency: .weekly, depositWeekday: 4, depositMonthlyDay: 1, depositTime: Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date(), monthlyInterestPercent: 1, lastInterestAppliedMonthKey: nil, lastScheduledAllowancePaymentAt: nil)
+        FamilyKid(id: UUID(), name: "Noa", birthday: Calendar.current.date(from: DateComponents(year: 2016, month: 3, day: 12)), weeklyAllowance: 25, currentBalance: 81, icon: "star.fill", customImageData: nil, depositFrequency: .weekly, depositWeekday: 2, depositMonthlyDay: 1, depositTime: Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date(), monthlyInterestPercent: 1, lastInterestAppliedMonthKey: nil, lastScheduledAllowancePaymentAt: nil, lastBirthdayHistoryYearKey: nil),
+        FamilyKid(id: UUID(), name: "Liam", birthday: Calendar.current.date(from: DateComponents(year: 2014, month: 7, day: 22)), weeklyAllowance: 20, currentBalance: 43, icon: "gamecontroller.fill", customImageData: nil, depositFrequency: .monthly, depositWeekday: 3, depositMonthlyDay: 10, depositTime: Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date(), monthlyInterestPercent: 2, lastInterestAppliedMonthKey: nil, lastScheduledAllowancePaymentAt: nil, lastBirthdayHistoryYearKey: nil),
+        FamilyKid(id: UUID(), name: "Maya", birthday: nil, weeklyAllowance: 15, currentBalance: 29, icon: "book.fill", customImageData: nil, depositFrequency: .weekly, depositWeekday: 4, depositMonthlyDay: 1, depositTime: Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date(), monthlyInterestPercent: 1, lastInterestAppliedMonthKey: nil, lastScheduledAllowancePaymentAt: nil, lastBirthdayHistoryYearKey: nil)
     ]
 }
 
@@ -1652,6 +1705,7 @@ extension FamilyKid: Codable {
         case id, name, birthday, weeklyAllowance, currentBalance, icon, customImageData
         case depositFrequency, depositWeekday, depositMonthlyDay, depositTime
         case monthlyInterestPercent, lastInterestAppliedMonthKey, lastScheduledAllowancePaymentAt
+        case lastBirthdayHistoryYearKey
     }
 
     init(from decoder: Decoder) throws {
@@ -1673,6 +1727,7 @@ extension FamilyKid: Codable {
         monthlyInterestPercent = min(30, max(0, rawPercent))
         lastInterestAppliedMonthKey = try container.decodeIfPresent(String.self, forKey: .lastInterestAppliedMonthKey)
         lastScheduledAllowancePaymentAt = try container.decodeIfPresent(Date.self, forKey: .lastScheduledAllowancePaymentAt)
+        lastBirthdayHistoryYearKey = try container.decodeIfPresent(String.self, forKey: .lastBirthdayHistoryYearKey)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -1691,6 +1746,7 @@ extension FamilyKid: Codable {
         try container.encode(monthlyInterestPercent, forKey: .monthlyInterestPercent)
         try container.encodeIfPresent(lastInterestAppliedMonthKey, forKey: .lastInterestAppliedMonthKey)
         try container.encodeIfPresent(lastScheduledAllowancePaymentAt, forKey: .lastScheduledAllowancePaymentAt)
+        try container.encodeIfPresent(lastBirthdayHistoryYearKey, forKey: .lastBirthdayHistoryYearKey)
     }
 }
 
@@ -1706,6 +1762,7 @@ extension FamilyKid: Codable {
 
 private struct ImagePicker: UIViewControllerRepresentable {
     @Binding var selectedImage: UIImage?
+    var onImagePicked: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
@@ -1735,6 +1792,7 @@ private struct ImagePicker: UIViewControllerRepresentable {
             } else if let originalImage = info[.originalImage] as? UIImage {
                 parent.selectedImage = originalImage
             }
+            parent.onImagePicked?()
             parent.dismiss()
         }
 

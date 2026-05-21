@@ -775,16 +775,6 @@ private struct GoalRowView: View {
         }
     }
 
-    private var progressHighCompletionGlow: (color: Color, radius: CGFloat) {
-        guard progressColorTier == .green else {
-            return (.clear, 0)
-        }
-        let intensity = min(1, (progress - 0.7) / 0.3)
-        let opacity = 0.22 + 0.38 * intensity
-        let radius: CGFloat = 4 + 6 * intensity
-        return (Color.appGreen.opacity(opacity), radius)
-    }
-
     private let progressPercentReserveWidth: CGFloat = 48
 
     var body: some View {
@@ -819,19 +809,12 @@ private struct GoalRowView: View {
 
                 GeometryReader { geometry in
                     let fillWidth = max(0, geometry.size.width * progress)
-                    let glow = progressHighCompletionGlow
                     ZStack(alignment: .leading) {
                         Capsule()
                             .fill(progressTrackGradient)
                         Capsule()
                             .fill(progressFillGradient)
                             .frame(width: fillWidth)
-                            .shadow(
-                                color: progressColorTier == .green ? glow.color : .clear,
-                                radius: progressColorTier == .green ? glow.radius : 0,
-                                x: 0,
-                                y: 0
-                            )
                     }
                 }
                 .frame(height: 9)

@@ -26,6 +26,7 @@ struct SettingsView: View {
     @State private var showingAbout = false
     @State private var showingExportAlert = false
     @State private var exportAlertMessage = ""
+    @State private var showingClearHistoryAlert = false
     @State private var showingClearDataAlert = false
     @State private var showingDeleteTypingPrompt = false
     @State private var deleteConfirmationText = ""
@@ -96,6 +97,17 @@ struct SettingsView: View {
                             trailingText: nil
                         ) {
                             exportDataToPDF()
+                        }
+
+                        settingsButtonRow(
+                            icon: "clock.arrow.circlepath",
+                            iconColor: .orange,
+                            title: languageManager.text(.settingsClearHistoryTitle),
+                            subtitle: languageManager.text(.settingsClearHistorySubtitle),
+                            trailingText: nil,
+                            titleColor: .red
+                        ) {
+                            showingClearHistoryAlert = true
                         }
 
                         settingsButtonRow(
@@ -188,6 +200,14 @@ struct SettingsView: View {
                 Button(languageManager.text(.commonOK), role: .cancel) { }
             } message: {
                 Text(exportAlertMessage)
+            }
+            .alert(languageManager.text(.settingsClearHistoryAlertTitle), isPresented: $showingClearHistoryAlert) {
+                Button(languageManager.text(.commonCancel), role: .cancel) { }
+                Button(languageManager.text(.settingsClearHistoryTitle), role: .destructive) {
+                    historyStore.clearAllHistory()
+                }
+            } message: {
+                Text(languageManager.text(.settingsClearHistoryAlertMessage))
             }
             .alert("Are you sure? all data will be deleted, this cannot be undone!", isPresented: $showingClearDataAlert) {
                 Button("Cancel", role: .cancel) { }

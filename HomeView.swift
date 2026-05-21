@@ -119,7 +119,18 @@ struct HomeView: View {
                     }
                 ) { updatedKid in
                     familyStore.updateKid(updatedKid)
-                    historyStore.recordKidUpdated(kidId: updatedKid.id, kidName: updatedKid.name)
+                    let changes = KidProfileUpdateSummary.changeLines(
+                        from: kid,
+                        to: updatedKid,
+                        language: languageManager.language
+                    )
+                    if !changes.isEmpty {
+                        historyStore.recordKidUpdated(
+                            kidId: updatedKid.id,
+                            kidName: updatedKid.name,
+                            changeLines: changes
+                        )
+                    }
                 }
             }
             .sheet(item: $activeTransactionType) { type in

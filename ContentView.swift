@@ -143,6 +143,7 @@ struct ContentView: View {
     private func processAutomations() {
         familyStore.processScheduledAllowanceIfNeeded(activityStore: activityStore, historyStore: historyStore)
         familyStore.processMonthlyInterestIfNeeded(activityStore: activityStore, historyStore: historyStore)
+        familyStore.processBirthdayHistoryIfNeeded(historyStore: historyStore)
     }
 }
 

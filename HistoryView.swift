@@ -212,7 +212,7 @@ private struct HistoryEntryDetailSheet: View {
     let kid: FamilyKid?
 
     private var localizedTitle: String {
-        AppStringCatalog.localizedHistoryTitle(storedTitle: entry.title, language: languageManager.language)
+        AppStringCatalog.localizedHistoryDetailTitle(storedTitle: entry.title, language: languageManager.language)
     }
 
     private var formattedDateTime: String {
@@ -223,6 +223,145 @@ private struct HistoryEntryDetailSheet: View {
         return formatter.string(from: entry.date)
     }
 
+    private var isAllowancePaidEntry: Bool {
+        switch entry.title {
+        case FamilyHistoryEvent.scheduledAllowancePaid.title, "Allowance paid", "Weekly allowance paid":
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var isInterestCreditedEntry: Bool {
+        entry.title == FamilyHistoryEvent.monthlyInterestCredited.title || entry.title == "Interest credited"
+    }
+
+    private var interestCreditedDetailText: String {
+        AppStringCatalog.localizedInterestCreditedDetail(
+            storedDetail: entry.displayDetail,
+            language: languageManager.language
+        )
+    }
+
+    private var isNewGoalEntry: Bool {
+        switch entry.title {
+        case FamilyHistoryEvent.goalAdded.title, "Goal added", "New goal":
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var isDepositOrWithdrawEntry: Bool {
+        switch entry.title {
+        case FamilyHistoryEvent.manualDeposit.title, "Deposit",
+             FamilyHistoryEvent.manualWithdraw.title, "Withdrawal":
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var newGoalDetailParts: (name: String, price: String)? {
+        guard isNewGoalEntry else { return nil }
+        let text = entry.displayDetail
+        guard let separator = text.range(of: " · ") else { return nil }
+        let name = String(text[..<separator.lowerBound])
+        let price = String(text[separator.upperBound...])
+        guard !name.isEmpty, !price.isEmpty else { return nil }
+        return (name, price)
+    }
+
+    private var isKidUpdatedEntry: Bool {
+        entry.title == FamilyHistoryEvent.kidUpdated.title || entry.title == "Kid updated"
+    }
+
+    private var isBirthdayEntry: Bool {
+        entry.title == FamilyHistoryEvent.kidBirthday.title || entry.title == "Birthday"
+    }
+
+    private var birthdayDetailText: String {
+        let name = entry.kidName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            ? entry.kidName!
+            : entry.displayDetail
+        return AppStringCatalog.localizedKidBirthdayHistoryDetail(
+            kidName: name,
+            language: languageManager.language
+        )
+    }
+
+    private var kidUpdateChangeLines: [String] {
+        guard isKidUpdatedEntry else { return [] }
+        return entry.displayDetail
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private var depositWithdrawDetailParts: (amount: String, note: String?)? {
+        guard isDepositOrWithdrawEntry else { return nil }
+        let text = entry.displayDetail
+        guard !text.isEmpty else { return nil }
+        if let separator = text.range(of: " · ") {
+            let amount = String(text[..<separator.lowerBound])
+            let note = String(text[separator.upperBound...])
+            guard !amount.isEmpty else { return nil }
+            return (amount, note.isEmpty ? nil : note)
+        }
+        return (text, nil)
+    }
+
+    private var emphasisDetailFont: Font { .title2.weight(.bold) }
+
+    @ViewBuilder
+    private var detailContent: some View {
+        if let parts = newGoalDetailParts {
+            VStack(spacing: 8) {
+                Text(parts.name)
+                    .font(emphasisDetailFont)
+                    .multilineTextAlignment(.center)
+                Text(parts.price)
+                    .font(emphasisDetailFont)
+                    .multilineTextAlignment(.center)
+            }
+        } else if !kidUpdateChangeLines.isEmpty {
+            VStack(spacing: 8) {
+                ForEach(kidUpdateChangeLines, id: \.self) { line in
+                    Text(line)
+                        .font(emphasisDetailFont)
+                        .multilineTextAlignment(.center)
+                }
+            }
+        } else if let parts = depositWithdrawDetailParts {
+            VStack(spacing: 8) {
+                Text(parts.amount)
+                    .font(emphasisDetailFont)
+                    .multilineTextAlignment(.center)
+                if let note = parts.note {
+                    Text(note)
+                        .font(emphasisDetailFont)
+                        .multilineTextAlignment(.center)
+                }
+            }
+        } else if isAllowancePaidEntry {
+            Text(entry.displayDetail)
+                .font(emphasisDetailFont)
+                .multilineTextAlignment(.center)
+        } else if isInterestCreditedEntry {
+            Text(interestCreditedDetailText)
+                .font(emphasisDetailFont)
+                .multilineTextAlignment(.center)
+        } else if isBirthdayEntry {
+            Text(birthdayDetailText)
+                .font(emphasisDetailFont)
+                .multilineTextAlignment(.center)
+        } else {
+            Text(entry.displayDetail)
+                .font(.body)
+                .multilineTextAlignment(.center)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             ScrollView {
@@ -231,13 +370,18 @@ private struct HistoryEntryDetailSheet: View {
                         .font(.title3.weight(.semibold))
                         .multilineTextAlignment(.center)
 
+                    Rectangle()
+                        .fill(Color.black)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 1)
+
                     if let kidName = entry.kidName, !kidName.isEmpty {
                         HStack(spacing: 12) {
                             if let kid {
                                 KidStoredIconView(
                                     iconName: kid.icon,
                                     customImageData: kid.customImageData,
-                                    size: 48,
+                                    size: 60,
                                     symbolAccentColor: kid.iconColor
                                 )
                             }
@@ -248,15 +392,13 @@ private struct HistoryEntryDetailSheet: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                     }
 
-                    Text(entry.displayDetail)
-                        .font(.body)
+                    detailContent
                         .foregroundStyle(.primary)
-                        .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text(formattedDateTime)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -273,7 +415,7 @@ private struct HistoryEntryDetailSheet: View {
         .padding(.horizontal, 28)
         .padding(.top, 43)
         .padding(.bottom, 10)
-        .presentationDetents([.height(300)])
+        .presentationDetents([.height(360)])
         .presentationDragIndicator(.visible)
     }
 }
@@ -291,6 +433,19 @@ private struct FamilyHistoryRowView: View {
         return String(source.prefix(1)).uppercased()
     }
 
+    private var historyRowDetail: String {
+        if entry.title == FamilyHistoryEvent.kidBirthday.title || entry.title == "Birthday" {
+            let name = entry.kidName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                ? entry.kidName!
+                : entry.displayDetail
+            return AppStringCatalog.localizedKidBirthdayHistoryDetail(
+                kidName: name,
+                language: languageManager.language
+            )
+        }
+        return entry.displayDetail
+    }
+
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
             avatarView
@@ -302,7 +457,7 @@ private struct FamilyHistoryRowView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
 
-                Text(entry.displayDetail)
+                Text(historyRowDetail)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -317,8 +472,7 @@ private struct FamilyHistoryRowView: View {
                     .foregroundColor(.secondary)
                 Text(formattedTime(entry.date))
                     .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
+                    .foregroundColor(.secondary)
             }
         }
         .padding()
